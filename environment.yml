@@ -1,0 +1,33 @@
+name: MARL2023paper_env
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pytorch
+  - numpy
+  - pandas
+  - scipy
+  - matplotlib
+  - pandapower
+  - tqdm
+  - tensorboard
+  - ipykernel
+  - pip
+  - imageio
+  - numba
+  - suitesparse
+  - pybind11
+  - ipywidgets
+  - optuna
+  - plotly
+  - nbformat
+  - python-kaleido
+  - scienceplots
+  - pip:
+    - grid2op
+    - l2rpn_baselines
+    - lightsim2grid==0.7.3
+    - attr
+    - torch_geometric
+
