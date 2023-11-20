@@ -53,13 +53,13 @@ def get_agent(agent_name):
     AGENT = {
         'sac': SMAAC,
         'sac2': SAC,
-        'sacd': SacdGoal,
-        'sacd2': SacdSimple,
-        'masacd': IMARL,
+        'sacd': SacdSimple,
+        'sacd2': SacdGoal,
+        'isacd': IMARL,
         'dqn': DQN,
         'dqn2': DQN2,
         'ppo': PPO,
-        'mappo': IMARL,
+        'ippo': IMARL,
         'dsacd': DepMARL,
         'dppo': DepMARL
     }

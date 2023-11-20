@@ -1,20 +1,16 @@
 import torch
-import torch.optim as optim
-import numpy as np
-import os
 from grid2op.Action import BaseAction
 
 
 from l2rpn_base_agent import L2rpnAgent
 from MARL.MASACD import BaseSacd, DependentSacd, BaseSacdSharedLayer
 from BaseAgents.BasePPO import BasePPO, DependentPPO
-from MARL.converters import MADiscActionConverter, MADiscActionConverter2
-from models import EncoderLayer
+from MARL.converters import MADiscActionConverter
 from MARL.MiddleAgent import RuleBasedSubPicker, RandomOrderedSubPicker, FixedSubPicker
 
 AGENT = {
-    'masacd': BaseSacd,
-    'mappo': BasePPO,
+    'isacd': BaseSacd,
+    'ippo': BasePPO,
     'dsacd': DependentSacd,
     'dppo': DependentPPO,
     'sharedsacd': BaseSacdSharedLayer,

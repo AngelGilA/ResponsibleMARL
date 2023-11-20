@@ -52,7 +52,23 @@ python evaluate.py -rd=result -mn=case_5_ppo
 ```
 
 ## Agent algorithms implemented
+Below the agents that are implemented are listed as: 
 
+'agent_name': _Name or description of the algorithm used (abbreviation)_ (link to paper)
+
+Where 'agent_name' is what is used when training a specific agent. As described in the Train section.
+
+1. 'isacd': _Multi agent Independend SACD (ISACD)_, <sub><sup>([E. van der Sar et al 2023](https://doi.org/10.48550/arXiv.1910.07207)) </sub></sup>
+1. 'ippo': _Multi agent Independend PPO (IPPO)_, <sub><sup>([E. van der Sar et al 2023](https://doi.org/10.48550/arXiv.1910.07207)) </sub></sup>
+1. 'dsacd': _Multi agent Dependend SACD (DSACD)_, <sub><sup>([E. van der Sar et al 2023](https://doi.org/10.48550/arXiv.1910.07207)) </sub></sup>
+1. 'dppo': _Multi agent Dependend PPO (DPPO)_, <sub><sup>([E. van der Sar et al 2023](https://doi.org/10.48550/arXiv.1910.07207)) </sub></sup>
+1. 'sacd': _Single agent Soft Actor Critic Discrete (SACD)_, <sub><sup>([P. Christodoulou 2019](https://doi.org/10.48550/arXiv.1910.07207)) </sub></sup>
+1. 'ppo': _Single agent Proximal Policy Optimization (PPO)_,<sub><sup>([J. Schulman et al 2017](https://doi.org/10.48550/arXiv.1707.06347)) </sub></sup>
+1. 'sac': _Semi-Markov Afterstate Actor-Critic (SMAAC)_ <sub><sup>([D.Yoon et al 2021](https://openreview.net/pdf?id=LmUJqB1Cz8)) </sub></sup>
+1. 'sac2': _Semi-Markov Afterstate Actor-Critic (SMAAC)_  (adjusted version, to how it was actually described in the paper.)
+1. 'sacd2': _SACD with a goal / list of actions set out (TEST)_
+1. 'dqn': Deep Q-learning (DQN), <sub><sup>([V. Mnih et al 2013](https://doi.org/10.48550/arXiv.1312.5602)) </sub></sup>
+1. 'dqn2': _DQN2, DQN with an adjusted GNN network (TEST)_
 
 
 ## References
@@ -68,5 +84,6 @@ python evaluate.py -rd=result -mn=case_5_ppo
 ```
 
 ## Credit
-The environment used for this code is rte-france's Grid2Op (https://github.com/rte-france/Grid2Op)
+The environment used for this code is rte-france's Grid2Op (https://github.com/rte-france/Grid2Op).
+
 Furthermore, the code of https://github.com/KAIST-AILab/SMAAC (Copyright (c) 2020 KAIST-AILab) was used as a basis for this code base.
