@@ -3,22 +3,23 @@ from abc import abstractmethod, ABC
 
 from util import ReplayBuffer
 
+
 class MyBaseAgent(ABC):
     def __init__(self, input_dim, action_dim, node_num, **kwargs):
         self.input_dim = input_dim
         self.action_dim = action_dim
-        self.state_dim = kwargs.get('state_dim', 128)
+        self.state_dim = kwargs.get("state_dim", 128)
         self.node_num = node_num
         self.update_step = 0
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.nheads = kwargs.get('head_number', 8)
+        self.nheads = kwargs.get("head_number", 8)
 
-        self.gamma = kwargs.get('gamma', 0.99)
-        self.dropout = kwargs.get('dropout', 0.)
-        self.memlen = kwargs.get('memlen', int(1e5))
+        self.gamma = kwargs.get("gamma", 0.99)
+        self.dropout = kwargs.get("dropout", 0.0)
+        self.memlen = kwargs.get("memlen", int(1e5))
         self.memory = ReplayBuffer(max_size=self.memlen)
-        self.batch_size = kwargs.get('batch_size', 128)
-        self.actor_lr = self.critic_lr = kwargs.get('lr', 5e-5)
+        self.batch_size = kwargs.get("batch_size", 128)
+        self.actor_lr = self.critic_lr = kwargs.get("lr", 5e-5)
 
         self.update_step = 0
         self.agent_step = 0
@@ -49,9 +50,16 @@ class MyBaseAgent(ABC):
         rewards = torch.FloatTensor(rewards).unsqueeze(1)
         dones = torch.FloatTensor(dones).unsqueeze(1)
         steps = torch.FloatTensor(steps).unsqueeze(1)
-        return states.to(self.device), adj.to(self.device), actions.to(self.device), \
-            rewards.to(self.device), states2.to(self.device), adj2.to(self.device), \
-            dones.to(self.device), steps.to(self.device)
+        return (
+            states.to(self.device),
+            adj.to(self.device),
+            actions.to(self.device),
+            rewards.to(self.device),
+            states2.to(self.device),
+            adj2.to(self.device),
+            dones.to(self.device),
+            steps.to(self.device),
+        )
 
     @abstractmethod
     def produce_action(self, stacked_state, adj, learn=False, sample=True):
@@ -60,9 +68,12 @@ class MyBaseAgent(ABC):
     def save_start_transition(self):
         pass
 
-    def save_transition(self, start_state, start_adj, action, reward, next_state, next_adj, done, n_step):
+    def save_transition(
+        self, start_state, start_adj, action, reward, next_state, next_adj, done, n_step
+    ):
         self.memory.append(
-            (start_state, start_adj, action, reward, next_state, next_adj, done, n_step))
+            (start_state, start_adj, action, reward, next_state, next_adj, done, n_step)
+        )
 
     @abstractmethod
     def update(self):

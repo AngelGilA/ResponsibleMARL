@@ -1,14 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from sublayer import MultiHeadAttention, PositionwiseFeedForward
+from NeuralNetworks.sublayer import MultiHeadAttention, PositionwiseFeedForward
 from torch_geometric.nn.conv.gatv2_conv import GATv2Conv
 
 
 class NewGAT(nn.Module):
     def __init__(self, output_dim, nheads, dropout=0):
         super(NewGAT, self).__init__()
-        self.slf_attn = GATv2Conv(output_dim, output_dim//nheads, nheads)
+        self.slf_attn = GATv2Conv(output_dim, output_dim // nheads, nheads)
         self.pos_ffn = PositionwiseFeedForward(output_dim, output_dim, dropout=dropout)
 
     def forward(self, x, edge_index):
@@ -22,18 +22,17 @@ class NewGAT(nn.Module):
 class GATLayer(nn.Module):
     def __init__(self, output_dim, nheads, dropout=0):
         super(GATLayer, self).__init__()
-        self.slf_attn = MultiHeadAttention(nheads, output_dim, output_dim//4, dropout=dropout)
+        self.slf_attn = MultiHeadAttention(nheads, output_dim, output_dim // 4, dropout=dropout)
         self.pos_ffn = PositionwiseFeedForward(output_dim, output_dim, dropout=dropout)
-    
+
     def forward(self, x, adj):
         x = self.slf_attn(x, adj)
         x = self.pos_ffn(x)
         return x
-        
-        
+
+
 class SmaacActor(nn.Module):
-    def __init__(self, output_dim, nheads, node, action_dim, dropout=0,
-                 init_w=3e-3, log_std_min=-10, log_std_max=1):
+    def __init__(self, output_dim, nheads, node, action_dim, dropout=0, init_w=3e-3, log_std_min=-10, log_std_max=1):
         super(SmaacActor, self).__init__()
         self.gat1 = GATLayer(output_dim, nheads, dropout)
         self.gat2 = GATLayer(output_dim, nheads, dropout)
@@ -57,7 +56,7 @@ class SmaacActor(nn.Module):
         mu = self.mu(x)
         log_std = self.log_std(x)
         log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
-        
+
         return mu, log_std, state
 
 
@@ -88,10 +87,10 @@ class SmaacSoftQ(nn.Module):
         hidden_dim = concat_dim // 4
         self.out = nn.Linear(concat_dim, hidden_dim)
         self.out2 = nn.Linear(hidden_dim, 1)
-        
+
     def forward(self, x, a, adj):
         x = self.gat1(x, adj)
-        x = self.down(x).squeeze(-1)    # B,N
+        x = self.down(x).squeeze(-1)  # B,N
         x = torch.cat([x, a], dim=1)
         # if order is not None:
         #     x = torch.cat([x, order], dim=-1)
@@ -105,7 +104,7 @@ class SmaacDoubleSoftQ(nn.Module):
         super(SmaacDoubleSoftQ, self).__init__()
         self.Q1 = SmaacSoftQ(output_dim, nheads, node, action_dim, dropout, init_w)
         self.Q2 = SmaacSoftQ(output_dim, nheads, node, action_dim, dropout, init_w)
-        
+
     def forward(self, x, a, adj):
         q1 = self.Q1(x, a, adj)
         q2 = self.Q2(x, a, adj)
@@ -169,8 +168,7 @@ class DoubleSoftQ(nn.Module):
 
 
 class Actor(nn.Module):
-    def __init__(self, output_dim, nheads, node, action_dim, dropout=0,
-                 init_w=3e-3, num_layers=3):
+    def __init__(self, output_dim, nheads, node, action_dim, dropout=0, init_w=3e-3, num_layers=3):
         # action_dim = np.sum(action_dim)
         super(Actor, self).__init__()
         self.layers = nn.ModuleList()
@@ -211,7 +209,7 @@ class DeepQNetwork(nn.Module):
         x = self.linear(x)
         for l in self.layers:
             if isinstance(l, GATLayer):
-                x = l(x,adj)
+                x = l(x, adj)
             else:
                 x = l(x)
         x = self.down(x).squeeze(-1)  # B,N
@@ -240,7 +238,7 @@ class DeepQNetwork2(nn.Module):
         """Reinitialize learnable parameters."""
         nn.init.xavier_uniform_(self.linear.weight)
         nn.init.xavier_uniform_(self.down.weight)
-        gain = nn.init.calculate_gain('leaky_relu')
+        gain = nn.init.calculate_gain("leaky_relu")
         nn.init.xavier_uniform_(self.out.weight, gain=gain)
         nn.init.xavier_uniform_(self.out2.weight)
 
@@ -249,7 +247,7 @@ class DeepQNetwork2(nn.Module):
         x = self.linear(x)
         for l in self.layers:
             if isinstance(l, NewGAT):
-                x = l(x,edge_index)
+                x = l(x, edge_index)
             else:
                 x = l(x)
         x = self.down(x).squeeze(-1)  # B,N

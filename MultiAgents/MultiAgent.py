@@ -2,35 +2,36 @@ import torch
 from grid2op.Action import BaseAction
 
 
-from l2rpn_base_agent import L2rpnAgent
-from MARL.MASACD import BaseSacd, DependentSacd, BaseSacdSharedLayer
-from BaseAgents.BasePPO import BasePPO, DependentPPO
-from MARL.converters import MADiscActionConverter
-from MARL.MiddleAgent import RuleBasedSubPicker, RandomOrderedSubPicker, FixedSubPicker
+from Agents.l2rpn_base_agent import L2rpnAgent
+from MultiAgents.MASACD import BaseSacd, DependentSacd, BaseSacdSharedLayer
+from MultiAgents.MAPPO import BasePPO, DependentPPO
+from MultiAgents.MAconverters import MADiscActionConverter
+from MultiAgents.MiddleAgent import RuleBasedSubPicker, RandomOrderedSubPicker, FixedSubPicker
 
 AGENT = {
-    'isacd': BaseSacd,
-    'ippo': BasePPO,
-    'dsacd': DependentSacd,
-    'dppo': DependentPPO,
-    'sharedsacd': BaseSacdSharedLayer,
+    "isacd": BaseSacd,
+    "ippo": BasePPO,
+    "dsacd": DependentSacd,
+    "dppo": DependentPPO,
+    "sharedsacd": BaseSacdSharedLayer,
 }
 
 MIDDLE_AGENT = {
-    'fixed': FixedSubPicker,
-    'random': RandomOrderedSubPicker,
-    'capa': RuleBasedSubPicker,
+    "fixed": FixedSubPicker,
+    "random": RandomOrderedSubPicker,
+    "capa": RuleBasedSubPicker,
 }
 
 
 class IMARL(L2rpnAgent):
     """
-        Multi Agent for L2RPN.
-        Each agent is responsible for one substation.
+    Multi Agent for L2RPN.
+    Each agent is responsible for one substation.
     """
+
     def __init__(self, env, **kwargs):
         super().__init__(env, **kwargs)
-        middle_agent = MIDDLE_AGENT[kwargs.get('middle_agent')]
+        middle_agent = MIDDLE_AGENT[kwargs.get("middle_agent")]
         self.sub_picker = middle_agent(self.action_converter.masked_sorted_sub, action_space=self.action_space)
 
         # create deep learning part of the agent
@@ -43,9 +44,11 @@ class IMARL(L2rpnAgent):
         return MADiscActionConverter(env, mask, mask_hi)
 
     def create_DLA(self, **kwargs):
-        agent_type = AGENT[kwargs.get('agent')]
-        agents = [agent_type(self.input_dim, act_dim, self.node_num, **kwargs)
-                  for act_dim in self.action_converter.n_sub_actions]
+        agent_type = AGENT[kwargs.get("agent")]
+        agents = [
+            agent_type(self.input_dim, act_dim, self.node_num, **kwargs)
+            for act_dim in self.action_converter.n_sub_actions
+        ]
         self.agents = dict(zip(self.action_converter.masked_sorted_sub, agents))
 
     def reset(self, obs):
@@ -60,7 +63,7 @@ class IMARL(L2rpnAgent):
             (sub_2_act, action) = self.goal
             sub_vals = self.agents[sub_2_act].cache_stat()
             cache_extra = {
-                'sub_vals': sub_vals,
+                "sub_vals": sub_vals,
             }
             cache.update(cache_extra)
         return cache
@@ -69,7 +72,7 @@ class IMARL(L2rpnAgent):
         super().load_cache_stat(cache)
         if self.goal is not None:
             (sub_2_act, action) = self.goal
-            sub_vals = cache['sub_vals']
+            sub_vals = cache["sub_vals"]
             self.agents[sub_2_act].load_cache_stat(sub_vals)
 
     def agent_act(self, obs, is_safe, sample, dn_count=0) -> BaseAction:
@@ -86,13 +89,9 @@ class IMARL(L2rpnAgent):
                     self.update_goal(goal)
                 elif (act == self.action_space()) & (dn_count < len(self.sub_picker.masked_sorted_sub)):
                     # skip DoNothing action when we are not training
-                    act = self.agent_act(obs, is_safe, sample, dn_count=dn_count+1)
+                    act = self.agent_act(obs, is_safe, sample, dn_count=dn_count + 1)
                 return act
         else:
-            # environment is safe -> empty current sub to do list.
-            # if self.need4reset:
-            #     self.sub_picker.reset()
-            #     self.need4reset = False
             return self.action_space()
 
     def save_start_transition(self):
@@ -105,12 +104,20 @@ class IMARL(L2rpnAgent):
         next_state = self.get_current_state()
         next_adj = self.adj.clone()
         sub, action = self.start_goal
-        self.agents[sub].save_transition(self.start_state, self.start_adj, action, reward,
-                                         next_state, next_adj, int(done), n_step)
+        self.agents[sub].save_transition(
+            self.start_state,
+            self.start_adj,
+            action,
+            reward,
+            next_state,
+            next_adj,
+            int(done),
+            n_step,
+        )
 
     def check_start_update(self):
         agent_mem_sizes = [len(agent.memory) for agent in self.agents.values()]
-        if (max(agent_mem_sizes) >=  self.update_start):
+        if max(agent_mem_sizes) >= self.update_start:
             return True
         return False
 
@@ -122,21 +129,21 @@ class IMARL(L2rpnAgent):
 
     def print_updates_per_agent(self):
         for agent in self.agents.items():
-            print(f'Agent for sub {agent[0]} had {agent[1].update_step} updates')
+            print(f"Agent for sub {agent[0]} had {agent[1].update_step} updates")
         print(f"Middle-Agent transition matrix:\n{self.sub_picker.count}")
 
     def save_model(self, path, name):
-        [agent.save_model(f'{path}', f'{name}_sub_{sub}') for sub, agent in self.agents.items()]
+        [agent.save_model(f"{path}", f"{name}_sub_{sub}") for sub, agent in self.agents.items()]
 
     def load_model(self, path, name=None):
-        [agent.load_model(f'{path}', f'{name}_sub_{sub}') for sub, agent in self.agents.items()]
+        [agent.load_model(f"{path}", f"{name}_sub_{sub}") for sub, agent in self.agents.items()]
 
 
 class DepMARL(IMARL):
     def update(self):
         self.update_step += 1
         transition_probs = self.sub_picker.transition_probs
-        for (agent, trans_probs_agent) in zip(self.agents.values(), transition_probs):
+        for agent, trans_probs_agent in zip(self.agents.values(), transition_probs):
             if len(agent.memory) >= self.update_start:
                 agent.dependent_update(self.agents.values(), trans_probs_agent)
 

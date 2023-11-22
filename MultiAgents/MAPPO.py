@@ -5,9 +5,8 @@ from torch.distributions import Categorical
 import os
 import numpy as np
 
-
-from BaseAgents.BaseAgent import MyBaseAgent
-from models import CriticNetwork, Actor
+from MultiAgents.BaseAgent import MyBaseAgent
+from NeuralNetworks.models import CriticNetwork, Actor
 
 
 def create_critic_actor(input_dim, state_dim, nheads, node_num, action_dim, dropout, num_layers=3):
@@ -35,21 +34,35 @@ class PPOMemory:
         batch_start = np.arange(0, n_states, batch_size)
         indices = np.arange(n_states, dtype=np.int64)
         np.random.shuffle(indices)
-        batches = [indices[i:i + batch_size] for i in batch_start]
+        batches = [indices[i : i + batch_size] for i in batch_start]
 
-        return self.states, \
-               self.adj, \
-               self.actions, \
-               self.logprobs, \
-               self.vals, \
-               self.next_states, \
-               self.next_adj, \
-               self.rewards, \
-               self.dones, \
-               self.steps,\
-               batches
+        return (
+            self.states,
+            self.adj,
+            self.actions,
+            self.logprobs,
+            self.vals,
+            self.next_states,
+            self.next_adj,
+            self.rewards,
+            self.dones,
+            self.steps,
+            batches,
+        )
 
-    def append(self, state, adj, action, log_prob, value, next_state, next_adj, reward, done, steps):
+    def append(
+        self,
+        state,
+        adj,
+        action,
+        log_prob,
+        value,
+        next_state,
+        next_adj,
+        reward,
+        done,
+        steps,
+    ):
         self.states.append(state)
         self.adj.append(adj)
         self.actions.append(action)
@@ -80,23 +93,34 @@ class PPOMemory:
 
 class BasePPO(MyBaseAgent):
     def __init__(self, input_dim, action_dim, node_num, **kwargs):
-        self.policy_clip = kwargs.get('epsilon', 0.2)
-        self.gae_lambda = kwargs.get('lambda', 0.95)
-        self.entropy_ceoff = kwargs.get('entropy', 0.001)
+        self.policy_clip = kwargs.get("epsilon", 0.2)
+        self.gae_lambda = kwargs.get("lambda", 0.95)
+        self.entropy_ceoff = kwargs.get("entropy", 0.001)
         super().__init__(input_dim, action_dim, node_num, **kwargs)
 
     def create_DLA(self, **kwargs):
         self.memory = PPOMemory()
-        self.critic, self.actor = create_critic_actor(self.input_dim, self.state_dim, self.nheads, self.node_num,
-                                                      self.action_dim, self.dropout,
-                                                      num_layers=kwargs.get('n_layers', 3))
+        self.critic, self.actor = create_critic_actor(
+            self.input_dim,
+            self.state_dim,
+            self.nheads,
+            self.node_num,
+            self.action_dim,
+            self.dropout,
+            num_layers=kwargs.get("n_layers", 3),
+        )
         self.actor.to(self.device)
         self.critic.to(self.device)
 
-        self.new_critic, self.new_actor = create_critic_actor(self.input_dim, self.state_dim, self.nheads,
-                                                              self.node_num,
-                                                              self.action_dim, self.dropout,
-                                                              num_layers=kwargs.get('n_layers', 3))
+        self.new_critic, self.new_actor = create_critic_actor(
+            self.input_dim,
+            self.state_dim,
+            self.nheads,
+            self.node_num,
+            self.action_dim,
+            self.dropout,
+            num_layers=kwargs.get("n_layers", 3),
+        )
         self.new_actor.to(self.device)
         self.new_critic.to(self.device)
         # optimizers only for new_critic and actor
@@ -119,21 +143,21 @@ class BasePPO(MyBaseAgent):
     def cache_stat(self):
         cache = super().cache_stat()
         cache_extra = {
-            'log_prob': self.log_prob,
-            'value': self.value,
+            "log_prob": self.log_prob,
+            "value": self.value,
         }
         cache.update(cache_extra)
         return cache
 
     def load_cache_stat(self, cache):
         super().load_cache_stat(cache)
-        self.log_prob = cache['log_prob']
-        self.value = cache['value']
+        self.log_prob = cache["log_prob"]
+        self.value = cache["value"]
 
     def produce_action(self, stacked_state, adj, learn=False, sample=True):
         """
-            Given the state, produces an action, the probability of the action, the log probability of the action, and
-            the argmax action
+        Given the state, produces an action, the probability of the action, the log probability of the action, and
+        the argmax action
         """
         state_x, state_t = stacked_state[..., :-1], stacked_state[..., -1:]
         actor_input = [state_x, state_t.squeeze(-1)]
@@ -153,18 +177,20 @@ class BasePPO(MyBaseAgent):
         self.start_log_prob = self.log_prob
         self.start_value = self.value
 
-    def save_transition(self,  start_state, start_adj, action, reward, next_state, next_adj, done, n_step):
+    def save_transition(self, start_state, start_adj, action, reward, next_state, next_adj, done, n_step):
         self.agent_step += 1
-        self.memory.append(start_state,
-                           start_adj,
-                           action,
-                           self.start_log_prob,
-                           self.start_value,
-                           reward,
-                           next_state,
-                           next_adj,
-                           int(done),
-                           n_step)
+        self.memory.append(
+            start_state,
+            start_adj,
+            action,
+            self.start_log_prob,
+            self.start_value,
+            reward,
+            next_state,
+            next_adj,
+            int(done),
+            n_step,
+        )
 
     def get_next_values(self, next_states, next_adj):
         with torch.no_grad():
@@ -176,8 +202,19 @@ class BasePPO(MyBaseAgent):
 
     def update(self):
         self.update_step += 1
-        states, adj, actions, log_probs, values, rewards, next_states, next_adj, dones, steps, batches = \
-            self.memory.generate_batches(self.batch_size)
+        (
+            states,
+            adj,
+            actions,
+            log_probs,
+            values,
+            rewards,
+            next_states,
+            next_adj,
+            dones,
+            steps,
+            batches,
+        ) = self.memory.generate_batches(self.batch_size)
 
         next_values = self.get_next_values(next_states, next_adj)
         # Advantages
@@ -247,21 +284,25 @@ class BasePPO(MyBaseAgent):
         advantage = torch.zeros(len(rewards))
         a_t = 0
         for t in range(len(rewards) - 1, -1, -1):
-            a_t = -values[t] + rewards[t] + (1-dones[t]) * self.gamma ** steps[t] * (next_values[t] + self.gae_lambda * a_t)
+            a_t = (
+                -values[t]
+                + rewards[t]
+                + (1 - dones[t]) * self.gamma ** steps[t] * (next_values[t] + self.gae_lambda * a_t)
+            )
             advantage[t] = a_t
         return advantage.to(self.device)
 
     def save_model(self, path, name):
-        torch.save(self.actor.state_dict(), os.path.join(path, f'{name}_actor.pt'))
-        torch.save(self.critic.state_dict(), os.path.join(path, f'{name}_emb.pt'))
+        torch.save(self.actor.state_dict(), os.path.join(path, f"{name}_actor.pt"))
+        torch.save(self.critic.state_dict(), os.path.join(path, f"{name}_emb.pt"))
 
     def load_model(self, path, name=None):
-        head = ''
+        head = ""
         if name is not None:
-            head = name + '_'
+            head = name + "_"
         pass
-        self.new_actor.load_state_dict(torch.load(os.path.join(path, f'{head}actor.pt'), map_location=self.device))
-        self.new_critic.load_state_dict(torch.load(os.path.join(path, f'{head}actor.pt'), map_location=self.device))
+        self.new_actor.load_state_dict(torch.load(os.path.join(path, f"{head}actor.pt"), map_location=self.device))
+        self.new_critic.load_state_dict(torch.load(os.path.join(path, f"{head}actor.pt"), map_location=self.device))
 
         self.actor.load_state_dict(self.new_actor.state_dict())
         self.critic.load_state_dict(self.new_critic.state_dict())
@@ -270,8 +311,19 @@ class BasePPO(MyBaseAgent):
 class DependentPPO(BasePPO):
     def dependent_update(self, all_agents, trans_probs):
         self.update_step += 1
-        states, adj, actions, log_probs, values, rewards, next_states, next_adj, dones, steps, batches = \
-            self.memory.generate_batches(self.batch_size)
+        (
+            states,
+            adj,
+            actions,
+            log_probs,
+            values,
+            rewards,
+            next_states,
+            next_adj,
+            dones,
+            steps,
+            batches,
+        ) = self.memory.generate_batches(self.batch_size)
 
         next_values = self.get_next_values(next_states, next_adj, all_agents, trans_probs)
         # Advantages

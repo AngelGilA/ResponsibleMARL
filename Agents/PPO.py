@@ -5,31 +5,44 @@ from torch.distributions import Categorical
 import os
 from grid2op.Action import BaseAction
 
-from BaseAgents.BasePPO import create_critic_actor, PPOMemory
-from l2rpn_base_agent import SingleAgent
+from MultiAgents.MAPPO import create_critic_actor, PPOMemory
+from Agents.l2rpn_base_agent import SingleAgent
 
 
 class PPO(SingleAgent):
     """
-        PPO
+    Single agent PPO
     """
+
     def __init__(self, env, **kwargs):
         super().__init__(env, **kwargs)
-        self.policy_clip = kwargs.get('epsilon', 0.2)
-        self.gae_lambda = kwargs.get('lambda', 0.95)
-        self.entropy_ceoff = kwargs.get('entropy', 0.001)
+        self.policy_clip = kwargs.get("epsilon", 0.2)
+        self.gae_lambda = kwargs.get("lambda", 0.95)
+        self.entropy_ceoff = kwargs.get("entropy", 0.001)
 
     def create_DLA(self, **kwargs):
         self.memory = PPOMemory()
-        self.critic, self.actor = create_critic_actor(self.input_dim, self.state_dim, self.nheads, self.node_num,
-                                                      self.action_dim, self.dropout,
-                                                      num_layers=kwargs.get('n_layers', 3))
+        self.critic, self.actor = create_critic_actor(
+            self.input_dim,
+            self.state_dim,
+            self.nheads,
+            self.node_num,
+            self.action_dim,
+            self.dropout,
+            num_layers=kwargs.get("n_layers", 3),
+        )
         self.actor.to(self.device)
         self.critic.to(self.device)
 
-        self.new_critic, self.new_actor = create_critic_actor(self.input_dim, self.state_dim, self.nheads, self.node_num,
-                                                              self.action_dim, self.dropout,
-                                                              num_layers=kwargs.get('n_layers', 3))
+        self.new_critic, self.new_actor = create_critic_actor(
+            self.input_dim,
+            self.state_dim,
+            self.nheads,
+            self.node_num,
+            self.action_dim,
+            self.dropout,
+            num_layers=kwargs.get("n_layers", 3),
+        )
         self.new_actor.to(self.device)
         self.new_critic.to(self.device)
         # optimizers only for new_critic and actor
@@ -52,16 +65,16 @@ class PPO(SingleAgent):
     def cache_stat(self):
         cache = super().cache_stat()
         cache_extra = {
-            'log_prob': self.log_prob,
-            'value': self.value,
+            "log_prob": self.log_prob,
+            "value": self.value,
         }
         cache.update(cache_extra)
         return cache
 
     def load_cache_stat(self, cache):
         super().load_cache_stat(cache)
-        self.log_prob = cache['log_prob']
-        self.value = cache['value']
+        self.log_prob = cache["log_prob"]
+        self.value = cache["value"]
 
     def agent_act(self, obs, is_safe, sample) -> BaseAction:
         # generate action if not safe
@@ -91,20 +104,22 @@ class PPO(SingleAgent):
         self.agent_step += 1
         next_state = self.get_current_state()
         next_adj = self.adj.clone()
-        self.memory.append(self.start_state,
-                           self.start_adj,
-                           self.start_goal,
-                           self.start_log_prob,
-                           self.start_value,
-                           reward,
-                           next_state,
-                           next_adj,
-                           int(done),
-                           n_step)
+        self.memory.append(
+            self.start_state,
+            self.start_adj,
+            self.start_goal,
+            self.start_log_prob,
+            self.start_value,
+            reward,
+            next_state,
+            next_adj,
+            int(done),
+            n_step,
+        )
 
     def produce_action(self, state, adj, sample=True):
         """Given the state, produces an action, the probability of the action, the log probability of the action, and
-               the argmax action"""
+        the argmax action"""
         state_x, state_t = state[..., :-1], state[..., -1:]
         actor_input = [state_x, state_t.squeeze(-1)]
         action_probs = self.actor(actor_input, adj)
@@ -137,8 +152,19 @@ class PPO(SingleAgent):
 
     def update(self):
         self.update_step += 1
-        states, adj, actions, log_probs, values, rewards, next_states, next_adj, dones, steps, batches = \
-            self.memory.generate_batches(self.batch_size)
+        (
+            states,
+            adj,
+            actions,
+            log_probs,
+            values,
+            rewards,
+            next_states,
+            next_adj,
+            dones,
+            steps,
+            batches,
+        ) = self.memory.generate_batches(self.batch_size)
 
         next_values = self.get_next_values(next_states, next_adj)
         # Advantages
@@ -146,14 +172,14 @@ class PPO(SingleAgent):
         states = torch.cat(states, 0).to(self.device)
         adj = torch.stack(adj, 0).to(self.device)
         actions = torch.stack(actions, 0).to(self.device)
-        log_probs = torch.stack(log_probs,0).to(self.device)
+        log_probs = torch.stack(log_probs, 0).to(self.device)
         values = torch.stack(values, 0).to(self.device)
 
         self.new_critic.train()
         self.new_actor.train()
         for batch in batches:
-            b_states = states[batch,:]
-            b_adj = adj[batch,:]
+            b_states = states[batch, :]
+            b_adj = adj[batch, :]
             b_actions = actions[batch]
             b_values = values[batch].squeeze()
             b_advantages = advantages[batch]
@@ -194,20 +220,24 @@ class PPO(SingleAgent):
         advantage = torch.zeros(len(rewards))
         a_t = 0
         for t in range(len(rewards) - 1, -1, -1):
-            a_t = -values[t] + rewards[t] + (1-dones[t]) * self.gamma ** steps[t] * (next_values[t] + self.gae_lambda * a_t)
+            a_t = (
+                -values[t]
+                + rewards[t]
+                + (1 - dones[t]) * self.gamma ** steps[t] * (next_values[t] + self.gae_lambda * a_t)
+            )
             advantage[t] = a_t
         return advantage.to(self.device)
 
     def save_model(self, path, name):
-        torch.save(self.actor.state_dict(), os.path.join(path, f'{name}_actor.pt'))
-        torch.save(self.critic.state_dict(), os.path.join(path, f'{name}_critic.pt'))
+        torch.save(self.actor.state_dict(), os.path.join(path, f"{name}_actor.pt"))
+        torch.save(self.critic.state_dict(), os.path.join(path, f"{name}_critic.pt"))
 
     def load_model(self, path, name=None):
-        head = ''
+        head = ""
         if name is not None:
-            head = name + '_'
-        self.new_actor.load_state_dict(torch.load(os.path.join(path, f'{head}actor.pt'), map_location=self.device))
-        self.new_critic.load_state_dict(torch.load(os.path.join(path, f'{head}critic.pt'), map_location=self.device))
+            head = name + "_"
+        self.new_actor.load_state_dict(torch.load(os.path.join(path, f"{head}actor.pt"), map_location=self.device))
+        self.new_critic.load_state_dict(torch.load(os.path.join(path, f"{head}critic.pt"), map_location=self.device))
 
         self.actor.load_state_dict(self.new_actor.state_dict())
         self.critic.load_state_dict(self.new_critic.state_dict())

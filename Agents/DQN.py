@@ -1,25 +1,23 @@
-import torch
-
-from l2rpn_base_agent import L2rpnAgent
-from models import DeepQNetwork, DeepQNetwork2
+from Agents.l2rpn_base_agent import L2rpnAgent
+from NeuralNetworks.models import DeepQNetwork, DeepQNetwork2
 import torch.optim as optim
 import torch.nn.functional as F
 import numpy as np
 import torch as T
 import os
 
-from torch_geometric.data import Data, Batch
-from torch_geometric.loader import DataLoader
+from torch_geometric.data import Data
 
 
 class DQN(L2rpnAgent):
     def create_DLA(self, **kwargs):
         super().create_DLA(**kwargs)
-        self.epsilon = kwargs.get('epsilon', 0.1)
-        self.eps_min = kwargs.get('eps_end', 0.05)
-        self.eps_dec = kwargs.get('eps_dec', 5e-4)
-        self.Q = DeepQNetwork(self.input_dim, self.state_dim, self.nheads, self.node_num, self.action_dim,
-                             self.dropout).to(self.device)
+        self.epsilon = kwargs.get("epsilon", 0.1)
+        self.eps_min = kwargs.get("eps_end", 0.05)
+        self.eps_dec = kwargs.get("eps_dec", 5e-4)
+        self.Q = DeepQNetwork(
+            self.input_dim, self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout
+        ).to(self.device)
         # optimizers
         self.Q.optimizer = optim.Adam(self.Q.parameters(), lr=self.critic_lr)
         self.Q.eval()
@@ -44,8 +42,7 @@ class DQN(L2rpnAgent):
         return self.Q.forward(stacked_x, adj)
 
     def update(self):
-        stacked_t, stacked_x, adj, actions, rewards, \
-        stacked2_t, stacked2_x, adj2, dones, steps = super().update()
+        stacked_t, stacked_x, adj, actions, rewards, stacked2_t, stacked2_x, adj2, dones, steps = super().update()
 
         self.Q.train()
 
@@ -61,29 +58,29 @@ class DQN(L2rpnAgent):
         self.Q.optimizer.step()
         self.Q.eval()
 
-        self.epsilon = self.epsilon - self.eps_dec \
-            if self.epsilon > self.eps_min else self.eps_min
+        self.epsilon = self.epsilon - self.eps_dec if self.epsilon > self.eps_min else self.eps_min
 
         return loss.data.numpy()
 
     def save_model(self, path, name):
-        T.save(self.Q.state_dict(), os.path.join(path, f'{name}_Q.pt'))
+        T.save(self.Q.state_dict(), os.path.join(path, f"{name}_Q.pt"))
 
     def load_model(self, path, name=None):
-        head = ''
+        head = ""
         if name is not None:
-            head = name + '_'
-        self.Q.load_state_dict(T.load(os.path.join(path, f'{head}Q.pt'), map_location=self.device))
+            head = name + "_"
+        self.Q.load_state_dict(T.load(os.path.join(path, f"{head}Q.pt"), map_location=self.device))
 
 
 class DQN2(DQN):
     def create_DLA(self, **kwargs):
         super().create_DLA(**kwargs)
-        self.epsilon = kwargs.get('epsilon', 0.1)
-        self.eps_min = kwargs.get('eps_end', 0.05)
-        self.eps_dec = kwargs.get('eps_dec', 5e-4)
-        self.Q = DeepQNetwork2(self.input_dim, self.state_dim, self.nheads, self.node_num, self.action_dim,
-                             self.dropout).to(self.device)
+        self.epsilon = kwargs.get("epsilon", 0.1)
+        self.eps_min = kwargs.get("eps_end", 0.05)
+        self.eps_dec = kwargs.get("eps_dec", 5e-4)
+        self.Q = DeepQNetwork2(
+            self.input_dim, self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout
+        ).to(self.device)
         # optimizers
         self.Q.optimizer = optim.Adam(self.Q.parameters(), lr=self.critic_lr)
         self.Q.eval()
@@ -92,8 +89,9 @@ class DQN2(DQN):
         # change to edge_index data
         if is_batch:
             graph_data = [
-                Data(x=stacked_x[i], edge_index=a.squeeze().nonzero().t().contiguous(), num_nodes=self.node_num) for
-                (i, a) in enumerate(adj.split(1))]
+                Data(x=stacked_x[i], edge_index=a.squeeze().nonzero().t().contiguous(), num_nodes=self.node_num)
+                for (i, a) in enumerate(adj.split(1))
+            ]
             q_values = T.zeros(self.batch_size, self.action_dim)
             for i, data in enumerate(graph_data):
                 q_values[i] = self.Q(data)

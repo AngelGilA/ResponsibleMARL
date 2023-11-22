@@ -38,6 +38,7 @@ class FixedSubPicker(object):
         probs[non_zero_rows] = self.count[non_zero_rows] / row_sums[non_zero_rows]
         return probs
 
+
 class RandomOrderedSubPicker(FixedSubPicker):
     def __init__(self, masked_sorted_sub, **kwargs):
         super().__init__(masked_sorted_sub)
@@ -60,8 +61,12 @@ class RuleBasedSubPicker(FixedSubPicker):
         self.sub_line_or = []
         self.sub_line_ex = []
         for sub in self.masked_sorted_sub:
-            self.sub_line_or.append(np.flatnonzero(action_space.line_or_to_subid == sub))
-            self.sub_line_ex.append(np.flatnonzero(action_space.line_ex_to_subid == sub))
+            self.sub_line_or.append(
+                np.flatnonzero(action_space.line_or_to_subid == sub)
+            )
+            self.sub_line_ex.append(
+                np.flatnonzero(action_space.line_ex_to_subid == sub)
+            )
 
     def pick_sub(self, obs, sample):
         if len(self.subs_2_act) == 0:
@@ -70,18 +75,20 @@ class RuleBasedSubPicker(FixedSubPicker):
             rhos = []
             for sub in self.masked_sorted_sub:
                 sub_i = np.flatnonzero(self.masked_sorted_sub == sub).squeeze()
-                rho = np.append(obs.rho[self.sub_line_or[sub_i]].copy(), obs.rho[self.sub_line_ex[sub_i]].copy())
+                rho = np.append(
+                    obs.rho[self.sub_line_or[sub_i]].copy(),
+                    obs.rho[self.sub_line_ex[sub_i]].copy(),
+                )
                 rho[rho == 0] = 3
                 rho_max = rho.max()
                 rho_mean = rho.mean()
                 rhos.append((rho_max, rho_mean))
-            order = sorted(zip(self.masked_sorted_sub, rhos), key=lambda x: (-x[1][0], -x[1][1]))
+            order = sorted(
+                zip(self.masked_sorted_sub, rhos), key=lambda x: (-x[1][0], -x[1][1])
+            )
             self.subs_2_act = list(list(zip(*order))[0])
         sub_2_act = self.subs_2_act.pop(0)
         if sample:
             self.count_transitions(sub_2_act)
             self.previous_sub = sub_2_act
         return sub_2_act
-
-
-

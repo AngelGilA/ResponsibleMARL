@@ -1,11 +1,12 @@
 import numpy as np
 
-from my_converters import SimpleDiscActionConverter
+from converters import SimpleDiscActionConverter
+
 
 class MADiscActionConverter(SimpleDiscActionConverter):
-    def __init__(self, env, mask, mask_hi, rule='c'):
+    def __init__(self, env, mask, mask_hi, rule="c"):
         super().__init__(env, mask, mask_hi, rule)
-        self.n = 0 # not relevant for MA
+        self.n = 0  # not relevant for MA
 
     def init_action_converter(self):
         # sort subs descending:
@@ -36,6 +37,10 @@ class MADiscActionConverter(SimpleDiscActionConverter):
 
 
 class MADiscActionConverter2(MADiscActionConverter):
+    """
+    Only difference is the sorting rule which is ascending instead of DEscending.
+    """
+
     def init_action_converter(self):
         # sort subs AScending:
         sort_subs = np.argsort(self.action_space.sub_info[self.action_space.sub_info > self.mask])

@@ -24,6 +24,7 @@ dependencies:
   - nbformat
   - python-kaleido
   - scienceplots
+  - black
   - pip:
     - grid2op
     - l2rpn_baselines

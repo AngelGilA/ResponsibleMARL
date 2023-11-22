@@ -1,23 +1,24 @@
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions.normal import Normal
-from models import SmaacDoubleSoftQ, SmaacActor
-from converter import *
+from NeuralNetworks.models import SmaacDoubleSoftQ, SmaacActor
+from converters import *
 from grid2op.Agent import BaseAgent
 
-from SACD import SacdGoal
+from Agents.SACD import SacdGoal
 
 EPSILON = 1e-6
 
 
 class SAC(SacdGoal):
     """
-        This is class contains the SMAAC-agent as described by Yoon et al.
+    This is class contains the SMAAC-agent as described by Yoon et al.
     """
+
     def __init__(self, env, **kwargs):
         # order is depreciated, it will not work anymore...
-        self.rule = kwargs.get('rule', 'c')
-        self.use_order = (self.rule == 'o')
+        self.rule = kwargs.get("rule", "c")
+        self.use_order = self.rule == "o"
 
         super().__init__(env, **kwargs)
 
@@ -28,15 +29,19 @@ class SAC(SacdGoal):
         super().create_DLA()
         if self.use_order:
             import warnings
+
             warnings.warn("Dont use use_order!!! COMPLETELY REMOVED!")
 
     def create_critic_actor(self):
-        self.Q = SmaacDoubleSoftQ(self.state_dim, self.nheads, self.node_num, self.action_dim,
-                                  self.dropout).to(self.device)
-        self.tQ = SmaacDoubleSoftQ(self.state_dim, self.nheads, self.node_num, self.action_dim,
-                                   self.dropout).to(self.device)
-        self.actor = SmaacActor(self.state_dim, self.nheads, self.node_num, self.action_dim,
-                                self.dropout).to(self.device)
+        self.Q = SmaacDoubleSoftQ(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(
+            self.device
+        )
+        self.tQ = SmaacDoubleSoftQ(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(
+            self.device
+        )
+        self.actor = SmaacActor(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(
+            self.device
+        )
 
     def def_target_entropy(self):
         self.target_entropy = -self.action_dim * 3
@@ -69,11 +74,10 @@ class SAC(SacdGoal):
 
         return action.detach().cpu()
 
-    def get_critic_loss(self, stacked_x, stacked_t, adj, actions, rewards,
-                        stacked2_x, stacked2_t, adj2, dones, steps):
+    def get_critic_loss(self, stacked_x, stacked_t, adj, actions, rewards, stacked2_x, stacked2_t, adj2, dones, steps):
         """
-            implementation of soft actor critic (Haarnoja et al 2018)
-            Soft actor critic implementation 'explained': https://www.youtube.com/watch?v=ioidsRlf79o
+        implementation of soft actor critic (Haarnoja et al 2018)
+        Soft actor critic implementation 'explained': https://www.youtube.com/watch?v=ioidsRlf79o
         """
         self.Q.train()
         self.emb.train()
@@ -110,10 +114,11 @@ class SAC(SacdGoal):
 
 class SMAAC(SAC):
     """
-        This is class contains the SMAAC-agent as it was implemented by Yoon et al.
-        NOTE: the big difference is that they generate a goal topology at the start of an episode even if it is in a safe state.
-        This is undesirable (according to TSO experts)
+    This is class contains the SMAAC-agent as it was implemented by Yoon et al.
+    NOTE: the big difference is that they generate a goal topology at the start of an episode even if it is in a safe state.
+    This is undesirable (according to TSO experts)
     """
+
     def agent_act(self, obs, is_safe, sample) -> BaseAgent:
         # generate goal if it is initial or previous goal has been reached
         if self.goal is None or (not is_safe and self.low_len == -1):
@@ -137,14 +142,13 @@ class SMAAC(SAC):
                 sub_or = self.action_space.line_or_to_subid[i]
                 sub_ex = self.action_space.line_ex_to_subid[i]
                 if obs.time_before_cooldown_sub[sub_or] == 0:
-                    act = self.action_space({'set_bus': {'lines_or_id': [(i, 1)]}})
+                    act = self.action_space({"set_bus": {"lines_or_id": [(i, 1)]}})
                 if obs.time_before_cooldown_sub[sub_ex] == 0:
-                    act = self.action_space({'set_bus': {'lines_ex_id': [(i, 1)]}})
+                    act = self.action_space({"set_bus": {"lines_ex_id": [(i, 1)]}})
                 if obs.time_before_cooldown_line[i] == 0:
                     status = self.action_space.get_change_line_status_vect()
                     status[i] = True
-                    act = self.action_space({'change_line_status': status})
+                    act = self.action_space({"change_line_status": status})
                 if act is not None:
                     return act
         return None
-

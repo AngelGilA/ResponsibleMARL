@@ -5,8 +5,7 @@ import torch
 from grid2op.Agent import BaseAgent
 from grid2op.Action import BaseAction
 
-from my_converters import SimpleDiscActionConverter
-from converter import ObsConverter
+from converters import ObsConverter, SimpleDiscActionConverter
 from util import ReplayBuffer
 
 EPSILON = 1e-6
@@ -18,25 +17,27 @@ class L2rpnAgent(BaseAgent):
         self.obs_space = env.observation_space
         self.action_space = env.action_space
         super(L2rpnAgent, self).__init__(env.action_space)
-        mask = kwargs.get('mask', 2)
-        mask_hi = kwargs.get('mask_hi', 19)
-        self.danger = kwargs.get('danger', 0.9)
+        mask = kwargs.get("mask", 2)
+        mask_hi = kwargs.get("mask_hi", 19)
+        self.danger = kwargs.get("danger", 0.9)
         self.thermal_limit = env._thermal_limit_a
         self.node_num = env.dim_topo
 
-        self.action_converter = self.create_action_converter(env, mask, mask_hi, bus_thresh=kwargs.get('threshold', 0.1))
-        self.obs_converter = ObsConverter(env, self.danger, self.device, attr=kwargs.get('input'))
+        self.action_converter = self.create_action_converter(
+            env, mask, mask_hi, bus_thresh=kwargs.get("threshold", 0.1)
+        )
+        self.obs_converter = ObsConverter(env, self.danger, self.device, attr=kwargs.get("input"))
 
         self.update_step = 0
         self.agent_step = 0
-        self.memlen = kwargs.get('memlen', int(1e5))
-        self.batch_size = kwargs.get('batch_size', 128)
-        self.update_start = self.batch_size * kwargs.get('update_start', 8)
-        self.gamma = kwargs.get('gamma', 0.99)
+        self.memlen = kwargs.get("memlen", int(1e5))
+        self.batch_size = kwargs.get("batch_size", 128)
+        self.update_start = self.batch_size * kwargs.get("update_start", 8)
+        self.gamma = kwargs.get("gamma", 0.99)
 
-        self.n_history = kwargs.get('n_history', 6)
+        self.n_history = kwargs.get("n_history", 6)
         self.input_dim = self.obs_converter.n_feature * self.n_history
-        self.fc_ts = kwargs.get('forecast', 0)
+        self.fc_ts = kwargs.get("forecast", 0)
         if self.fc_ts:
             print(f"NOTE: Using forecast {self.fc_ts} time steps ahead in this model")
             self.input_dim += self.fc_ts
@@ -61,9 +62,9 @@ class L2rpnAgent(BaseAgent):
 
     def load_mean_std(self, mean, std):
         self.state_mean = mean
-        self.state_std = std.masked_fill(std < 1e-5, 1.)
-        self.state_mean[0, sum(self.obs_space.shape[:20]):] = 0
-        self.state_std[0, sum(self.action_space.shape[:20]):] = 1
+        self.state_std = std.masked_fill(std < 1e-5, 1.0)
+        self.state_mean[0, sum(self.obs_space.shape[:20]) :] = 0
+        self.state_std[0, sum(self.action_space.shape[:20]) :] = 1
 
     def state_normalize(self, s):
         s = (s - self.state_mean) / self.state_std
@@ -82,31 +83,31 @@ class L2rpnAgent(BaseAgent):
 
     def cache_stat(self):
         cache = {
-            'last_topo': self.obs_converter.last_topo,
-            'topo': self.topo,
-            'goal': self.goal,
-            'adj': self.adj,
-            'stacked_obs': self.stacked_obs,
-            'forecast': self.forecast,
-            'start_date': self.start_state,
-            'start_adj': self.start_adj,
-            'save': self.save,
+            "last_topo": self.obs_converter.last_topo,
+            "topo": self.topo,
+            "goal": self.goal,
+            "adj": self.adj,
+            "stacked_obs": self.stacked_obs,
+            "forecast": self.forecast,
+            "start_date": self.start_state,
+            "start_adj": self.start_adj,
+            "save": self.save,
         }
         return cache
 
     def load_cache_stat(self, cache):
-        self.obs_converter.last_topo = cache['last_topo']
-        self.topo = cache['topo']
-        self.goal = cache['goal']
-        self.adj = cache['adj']
-        self.stacked_obs = cache['stacked_obs']
-        self.forecast = cache['forecast']
-        self.start_state = cache['start_date']
-        self.start_adj = cache['start_adj']
-        self.save = cache['save']
+        self.obs_converter.last_topo = cache["last_topo"]
+        self.topo = cache["topo"]
+        self.goal = cache["goal"]
+        self.adj = cache["adj"]
+        self.stacked_obs = cache["stacked_obs"]
+        self.forecast = cache["forecast"]
+        self.start_state = cache["start_date"]
+        self.start_adj = cache["start_adj"]
+        self.save = cache["save"]
 
     def hash_goal(self, goal):
-        hashed = ''
+        hashed = ""
         for i in goal.view(-1):
             hashed += str(int(i.item()))
         return hashed
@@ -137,11 +138,13 @@ class L2rpnAgent(BaseAgent):
         self.obs_converter.last_topo = np.where(obs.topo_vect == -1, self.obs_converter.last_topo, obs.topo_vect)
 
     def get_current_state(self):
-        return torch.cat(self.stacked_obs + self.forecast + [self.topo] if self.fc_ts
-                         else self.stacked_obs + [self.topo], dim=-1)
+        return torch.cat(
+            self.stacked_obs + self.forecast + [self.topo] if self.fc_ts else self.stacked_obs + [self.topo],
+            dim=-1,
+        )
 
     def act(self, obs, reward, done=False):
-        sample = (reward is None) # if reward is None we are TRAINING therefore take sample!
+        sample = reward is None  # if reward is None we are TRAINING therefore take sample!
         self.stack_obs(obs)
         is_safe = self.is_safe(obs)
         self.save = False
@@ -164,13 +167,13 @@ class L2rpnAgent(BaseAgent):
                 sub_or = self.action_space.line_or_to_subid[i]
                 sub_ex = self.action_space.line_ex_to_subid[i]
                 if obs.time_before_cooldown_sub[sub_or] == 0:
-                    act = self.action_space({'set_bus': {'lines_or_id': [(i, 1)]}})
+                    act = self.action_space({"set_bus": {"lines_or_id": [(i, 1)]}})
                 if obs.time_before_cooldown_sub[sub_ex] == 0:
-                    act = self.action_space({'set_bus': {'lines_ex_id': [(i, 1)]}})
+                    act = self.action_space({"set_bus": {"lines_ex_id": [(i, 1)]}})
                 if obs.time_before_cooldown_line[i] == 0:
                     status = self.action_space.get_change_line_status_vect()
                     status[i] = True
-                    act = self.action_space({'change_line_status': status})
+                    act = self.action_space({"change_line_status": status})
                 if act is not None:
                     return act
         return None
@@ -193,7 +196,18 @@ class L2rpnAgent(BaseAgent):
         self.agent_step += 1
         next_state = self.get_current_state()
         next_adj = self.adj.clone()
-        self.memory.append((self.start_state, self.start_adj, self.start_goal, reward, next_state, next_adj, int(done), n_step))
+        self.memory.append(
+            (
+                self.start_state,
+                self.start_adj,
+                self.start_goal,
+                reward,
+                next_state,
+                next_adj,
+                int(done),
+                n_step,
+            )
+        )
 
     def check_start_update(self):
         return len(self.memory) >= self.update_start
@@ -209,20 +223,47 @@ class L2rpnAgent(BaseAgent):
         rewards = torch.FloatTensor(rewards).unsqueeze(1)
         dones = torch.FloatTensor(dones).unsqueeze(1)
         steps = torch.FloatTensor(steps).unsqueeze(1)
-        return states.to(self.device), adj.to(self.device), actions.to(self.device), \
-               rewards.to(self.device), states2.to(self.device), adj2.to(self.device), \
-               dones.to(self.device), steps.to(self.device)
+        return (
+            states.to(self.device),
+            adj.to(self.device),
+            actions.to(self.device),
+            rewards.to(self.device),
+            states2.to(self.device),
+            adj2.to(self.device),
+            dones.to(self.device),
+            steps.to(self.device),
+        )
 
     @abstractmethod
     def update(self):
         self.update_step += 1
         batch = self.memory.sample(self.batch_size)
-        stacked_states, adj, actions, rewards, stacked_states2, adj2, dones, steps = self.unpack_batch(batch)
+        (
+            stacked_states,
+            adj,
+            actions,
+            rewards,
+            stacked_states2,
+            adj2,
+            dones,
+            steps,
+        ) = self.unpack_batch(batch)
 
         stacked_t, stacked_x = stacked_states[..., -1:], stacked_states[..., :-1]
         stacked2_t, stacked2_x = stacked_states2[..., -1:], stacked_states2[..., :-1]
 
-        return stacked_t, stacked_x, adj, actions, rewards, stacked2_t, stacked2_x, adj2, dones, steps
+        return (
+            stacked_t,
+            stacked_x,
+            adj,
+            actions,
+            rewards,
+            stacked2_t,
+            stacked2_x,
+            adj2,
+            dones,
+            steps,
+        )
 
     @abstractmethod
     def save_model(self, path, name):
@@ -237,11 +278,11 @@ class SingleAgent(L2rpnAgent):
     def __init__(self, env, **kwargs):
         super().__init__(env, **kwargs)
         self.action_dim = self.action_converter.n
-        self.nheads = kwargs.get('head_number', 8)
-        self.dropout = kwargs.get('dropout', 0.)
-        self.actor_lr = self.critic_lr = self.embed_lr =kwargs.get('lr', 5e-5)
+        self.nheads = kwargs.get("head_number", 8)
+        self.dropout = kwargs.get("dropout", 0.0)
+        self.actor_lr = self.critic_lr = self.embed_lr = kwargs.get("lr", 5e-5)
 
-        self.state_dim = kwargs.get('state_dim', 128)
+        self.state_dim = kwargs.get("state_dim", 128)
 
         # print(f'N: {self.node_num}, O: {self.input_dim}, S: {self.state_dim}, A: {self.action_dim}')
         # create deep learning part of the agent

@@ -6,19 +6,19 @@ import numpy as np
 import os
 
 
-from models import DoubleSoftQ, Actor, EncoderLayer
-from BaseAgents.BaseAgent import MyBaseAgent
+from NeuralNetworks.models import DoubleSoftQ, Actor, EncoderLayer
+from MultiAgents.BaseAgent import MyBaseAgent
 
 
 class BaseSacd(MyBaseAgent):
     def __init__(self, input_dim, action_dim, node_num, **kwargs):
-        self.target_update = kwargs.get('target_update', 1)
-        self.target_entropy_scale = kwargs.get('target_entropy_scale', 0.98)
-        self.tau = kwargs.get('tau', 1e-3)
-        self.hard_target = kwargs.get('hard_target', False)
-        self.target_update = kwargs.get('target_update', 1)
-        self.embed_lr = self.alpha_lr = kwargs.get('lr', 5e-5)
-        self.update_freq = kwargs.get('update_freq', 1)
+        self.target_update = kwargs.get("target_update", 1)
+        self.target_entropy_scale = kwargs.get("target_entropy_scale", 0.98)
+        self.tau = kwargs.get("tau", 1e-3)
+        self.hard_target = kwargs.get("hard_target", False)
+        self.target_update = kwargs.get("target_update", 1)
+        self.embed_lr = self.alpha_lr = kwargs.get("lr", 5e-5)
+        self.update_freq = kwargs.get("update_freq", 1)
 
         super().__init__(input_dim, action_dim, node_num, **kwargs)
         # entropy
@@ -27,10 +27,22 @@ class BaseSacd(MyBaseAgent):
         self.last_mem_len = 0
 
     def create_DLA(self, **kwargs):
-        self.emb = EncoderLayer(self.input_dim, self.state_dim, self.nheads, self.node_num,
-                                self.dropout, num_layers=kwargs.get('n_layers', 3)).to(self.device)
-        self.temb = EncoderLayer(self.input_dim, self.state_dim, self.nheads, self.node_num,
-                                 self.dropout, num_layers=kwargs.get('n_layers', 3)).to(self.device)
+        self.emb = EncoderLayer(
+            self.input_dim,
+            self.state_dim,
+            self.nheads,
+            self.node_num,
+            self.dropout,
+            num_layers=kwargs.get("n_layers", 3),
+        ).to(self.device)
+        self.temb = EncoderLayer(
+            self.input_dim,
+            self.state_dim,
+            self.nheads,
+            self.node_num,
+            self.dropout,
+            num_layers=kwargs.get("n_layers", 3),
+        ).to(self.device)
         self.create_critic_actor()
         # copy parameters
         self.tQ.load_state_dict(self.Q.state_dict())
@@ -49,10 +61,8 @@ class BaseSacd(MyBaseAgent):
 
     def create_critic_actor(self):
         # use different nn for critic and actor
-        self.Q = DoubleSoftQ(self.state_dim, self.nheads, self.node_num, self.action_dim,
-                             self.dropout).to(self.device)
-        self.tQ = DoubleSoftQ(self.state_dim, self.nheads, self.node_num, self.action_dim,
-                              self.dropout).to(self.device)
+        self.Q = DoubleSoftQ(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(self.device)
+        self.tQ = DoubleSoftQ(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(self.device)
         self.actor = Actor(self.state_dim, self.nheads, self.node_num, self.action_dim).to(self.device)
 
     def def_target_entropy(self):
@@ -64,7 +74,7 @@ class BaseSacd(MyBaseAgent):
 
     def produce_action(self, stacked_state, adj, learn=False, sample=True):
         """Given the state, produces an action, the probability of the action, the log probability of the action, and
-               the argmax action"""
+        the argmax action"""
         # stacked_state # B, N, F (batches, elements, features)
         state_x, state_t = stacked_state[..., :-1], stacked_state[..., -1:]
         state = self.emb(state_x, adj).detach()
@@ -84,11 +94,28 @@ class BaseSacd(MyBaseAgent):
 
     def update(self):
         if len(self.memory) >= self.last_mem_len + self.update_freq:
-            stacked_states, adj, actions, rewards, stacked_states2, adj2, dones, steps = super().update()
+            (
+                stacked_states,
+                adj,
+                actions,
+                rewards,
+                stacked_states2,
+                adj2,
+                dones,
+                steps,
+            ) = super().update()
 
             # critic loss
-            Q1_loss, Q2_loss = self.get_critic_loss(stacked_states, adj, actions, rewards,
-                                                    stacked_states2, adj2, dones, steps)
+            Q1_loss, Q2_loss = self.get_critic_loss(
+                stacked_states,
+                adj,
+                actions,
+                rewards,
+                stacked_states2,
+                adj2,
+                dones,
+                steps,
+            )
             self.update_critic(Q1_loss, Q2_loss)
             # actor loss
             actor_loss, alpha_loss = self.get_actor_loss(stacked_states, adj)
@@ -108,8 +135,7 @@ class BaseSacd(MyBaseAgent):
             for tp, p in zip(target_model.parameters(), local_model.parameters()):
                 tp.data.copy_(self.tau * p.data + (1 - self.tau) * tp.data)
 
-    def get_critic_loss(self, stacked_states, adj, actions, rewards,
-                        stacked_states2, adj2, dones, steps):
+    def get_critic_loss(self, stacked_states, adj, actions, rewards, stacked_states2, adj2, dones, steps):
         self.Q.train()
         self.emb.train()
         self.actor.eval()
@@ -118,8 +144,7 @@ class BaseSacd(MyBaseAgent):
         # compute Q-target values based on the received rewards.
         with torch.no_grad():
             tstates2 = self.temb(stacked2_x, adj2).detach()
-            action_probs, log_action_probs = \
-                self.produce_action(stacked_states2, adj2, learn=True)
+            action_probs, log_action_probs = self.produce_action(stacked_states2, adj2, learn=True)
             # modified soft state-value calculation for discrete case
             V_t2 = action_probs * (self.tQ.min_Q(tstates2, adj2) - self.alpha * log_action_probs)
             V_t2 = V_t2.sum(dim=1).unsqueeze(-1)
@@ -148,7 +173,7 @@ class BaseSacd(MyBaseAgent):
 
     def get_actor_loss(self, stacked_states, adj):
         """
-            Calculates the loss for the actor. This loss includes the additional entropy term
+        Calculates the loss for the actor. This loss includes the additional entropy term
         """
         stacked_t, stacked_x = stacked_states[..., -1:], stacked_states[..., :-1]
         self.actor.train()
@@ -159,8 +184,9 @@ class BaseSacd(MyBaseAgent):
         # log_action_probs = torch.sum(log_action_probs * action_probs, dim=1)
         # alpha loss: Calculates the loss for the entropy temperature parameter.
         # Test: re-use action probabilities for temperature loss (from https://docs.cleanrl.dev/rl-algorithms/sac/#implementation-details_1)
-        alpha_loss = (action_probs.detach() * (-self.log_alpha * (log_action_probs + self.target_entropy).
-                                               detach())).mean()
+        alpha_loss = (
+            action_probs.detach() * (-self.log_alpha * (log_action_probs + self.target_entropy).detach())
+        ).mean()
         return actor_loss, alpha_loss
 
     def update_actor(self, actor_loss, alpha_loss):
@@ -178,28 +204,47 @@ class BaseSacd(MyBaseAgent):
         self.alpha = self.log_alpha.exp()
 
     def save_model(self, path, name):
-        torch.save(self.actor.state_dict(), os.path.join(path, f'{name}_actor.pt'))
-        torch.save(self.emb.state_dict(), os.path.join(path, f'{name}_emb.pt'))
-        torch.save(self.Q.state_dict(), os.path.join(path, f'{name}_Q.pt'))
+        torch.save(self.actor.state_dict(), os.path.join(path, f"{name}_actor.pt"))
+        torch.save(self.emb.state_dict(), os.path.join(path, f"{name}_emb.pt"))
+        torch.save(self.Q.state_dict(), os.path.join(path, f"{name}_Q.pt"))
 
     def load_model(self, path, name=None):
-        head = ''
+        head = ""
         if name is not None:
-            head = name + '_'
-        self.actor.load_state_dict(torch.load(os.path.join(path, f'{head}actor.pt'), map_location=self.device))
-        emb = torch.load(os.path.join(path, f'{head}emb.pt'), map_location=self.device)
+            head = name + "_"
+        self.actor.load_state_dict(torch.load(os.path.join(path, f"{head}actor.pt"), map_location=self.device))
+        emb = torch.load(os.path.join(path, f"{head}emb.pt"), map_location=self.device)
         self.emb.load_state_dict(emb)
-        self.Q.load_state_dict(torch.load(os.path.join(path, f'{head}Q.pt'), map_location=self.device))
+        self.Q.load_state_dict(torch.load(os.path.join(path, f"{head}Q.pt"), map_location=self.device))
 
 
 class DependentSacd(BaseSacd):
     def dependent_update(self, all_agents, trans_probs):
         if len(self.memory) >= self.last_mem_len + self.update_freq:
-            stacked_states, adj, actions, rewards, stacked_states2, adj2, dones, steps = super(BaseSacd, self).update()
+            (
+                stacked_states,
+                adj,
+                actions,
+                rewards,
+                stacked_states2,
+                adj2,
+                dones,
+                steps,
+            ) = super(BaseSacd, self).update()
 
             # critic loss
-            Q1_loss, Q2_loss = self.get_critic_loss(stacked_states, adj, actions, rewards,
-                                                    stacked_states2, adj2, dones, steps, all_agents, trans_probs)
+            Q1_loss, Q2_loss = self.get_critic_loss(
+                stacked_states,
+                adj,
+                actions,
+                rewards,
+                stacked_states2,
+                adj2,
+                dones,
+                steps,
+                all_agents,
+                trans_probs,
+            )
             self.update_critic(Q1_loss, Q2_loss)
             # actor loss
             actor_loss, alpha_loss = self.get_actor_loss(stacked_states, adj)
@@ -212,9 +257,19 @@ class DependentSacd(BaseSacd):
             self.emb.eval()
             self.last_mem_len = len(self.memory)
 
-    def get_critic_loss(self, stacked_states, adj, actions, rewards,
-                        stacked_states2, adj2, dones, steps, all_agents=None, trans_probs=np.zeros(1)):
-
+    def get_critic_loss(
+        self,
+        stacked_states,
+        adj,
+        actions,
+        rewards,
+        stacked_states2,
+        adj2,
+        dones,
+        steps,
+        all_agents=None,
+        trans_probs=np.zeros(1),
+    ):
         self.Q.train()
         self.emb.train()
         self.actor.eval()
@@ -225,10 +280,8 @@ class DependentSacd(BaseSacd):
             # modified soft state-value calculation for discrete case
             V_agents_t2 = torch.zeros((self.batch_size, len(all_agents)))
             for i, agent in enumerate(all_agents):
-
                 tstates2 = agent.temb(stacked2_x, adj2).detach()
-                action_probs, log_action_probs = \
-                    agent.produce_action(stacked_states2, adj2, learn=True)
+                action_probs, log_action_probs = agent.produce_action(stacked_states2, adj2, learn=True)
                 V_j_t2 = action_probs * (agent.tQ.min_Q(tstates2, adj2) - agent.alpha * log_action_probs)
                 V_agents_t2[:, i] = V_j_t2.sum(dim=1)
             V_t2 = torch.Tensor(trans_probs) * V_agents_t2
@@ -266,9 +319,16 @@ class BaseSacdSharedLayer(BaseSacd):
         self.tQ.eval()
         self.actor.eval()
 
-    def produce_action(self, stacked_state, adj, learn=False, sample=True, shared_layer: EncoderLayer = None):
+    def produce_action(
+        self,
+        stacked_state,
+        adj,
+        learn=False,
+        sample=True,
+        shared_layer: EncoderLayer = None,
+    ):
         """Given the state, produces an action, the probability of the action, the log probability of the action, and
-               the argmax action"""
+        the argmax action"""
         # stacked_state # B, N, F
         state_x, state_t = stacked_state[..., :-1], stacked_state[..., -1:]
         state = shared_layer(state_x, adj).detach()
@@ -288,11 +348,29 @@ class BaseSacdSharedLayer(BaseSacd):
 
     def update(self, shared_layer: EncoderLayer = None):
         if len(self.memory) >= self.last_mem_len:
-            stacked_states, adj, actions, rewards, stacked_states2, adj2, dones, steps = super(BaseSacd, self).update()
+            (
+                stacked_states,
+                adj,
+                actions,
+                rewards,
+                stacked_states2,
+                adj2,
+                dones,
+                steps,
+            ) = super(BaseSacd, self).update()
 
             # critic loss
-            Q1_loss, Q2_loss = self.get_critic_loss(stacked_states, adj, actions, rewards,
-                                                    stacked_states2, adj2, dones, steps, shared_layer)
+            Q1_loss, Q2_loss = self.get_critic_loss(
+                stacked_states,
+                adj,
+                actions,
+                rewards,
+                stacked_states2,
+                adj2,
+                dones,
+                steps,
+                shared_layer,
+            )
             self.update_critic(Q1_loss, Q2_loss, shared_layer=shared_layer)
             # actor loss
             actor_loss, alpha_loss = self.get_actor_loss(stacked_states, adj, shared_layer=shared_layer)
@@ -303,8 +381,18 @@ class BaseSacdSharedLayer(BaseSacd):
             self.last_mem_len = len(self.memory)
         return shared_layer.eval()
 
-    def get_critic_loss(self, stacked_states, adj, actions, rewards,
-                        stacked_states2, adj2, dones, steps, shared_layer: EncoderLayer = None):
+    def get_critic_loss(
+        self,
+        stacked_states,
+        adj,
+        actions,
+        rewards,
+        stacked_states2,
+        adj2,
+        dones,
+        steps,
+        shared_layer: EncoderLayer = None,
+    ):
         self.Q.train()
         shared_layer.train()
         self.actor.eval()
@@ -313,8 +401,9 @@ class BaseSacdSharedLayer(BaseSacd):
         # compute Q-target values based on the received rewards.
         with torch.no_grad():
             tstates2 = shared_layer(stacked2_x, adj2).detach()
-            action_probs, log_action_probs = \
-                self.produce_action(stacked_states2, adj2, learn=True, shared_layer=shared_layer)
+            action_probs, log_action_probs = self.produce_action(
+                stacked_states2, adj2, learn=True, shared_layer=shared_layer
+            )
             # modified soft state-value calculation for discrete case
             V_t2 = action_probs * (self.tQ.min_Q(tstates2, adj2) - self.alpha * log_action_probs)
             V_t2 = V_t2.sum(dim=1).unsqueeze(-1)
@@ -343,7 +432,7 @@ class BaseSacdSharedLayer(BaseSacd):
 
     def get_actor_loss(self, stacked_states, adj, shared_layer: EncoderLayer = None):
         """
-            Calculates the loss for the actor. This loss includes the additional entropy term
+        Calculates the loss for the actor. This loss includes the additional entropy term
         """
         stacked_t, stacked_x = stacked_states[..., -1:], stacked_states[..., :-1]
         self.actor.train()
@@ -354,8 +443,9 @@ class BaseSacdSharedLayer(BaseSacd):
         # log_action_probs = torch.sum(log_action_probs * action_probs, dim=1)
         # alpha loss: Calculates the loss for the entropy temperature parameter.
         # Test: re-use action probabilities for temperature loss (from https://docs.cleanrl.dev/rl-algorithms/sac/#implementation-details_1)
-        alpha_loss = (action_probs.detach() * (-self.log_alpha * (log_action_probs + self.target_entropy).
-                                               detach())).mean()
+        alpha_loss = (
+            action_probs.detach() * (-self.log_alpha * (log_action_probs + self.target_entropy).detach())
+        ).mean()
         return actor_loss, alpha_loss
 
     def update_actor(self, actor_loss, alpha_loss, shared_layer: EncoderLayer = None):
@@ -371,12 +461,12 @@ class BaseSacdSharedLayer(BaseSacd):
         self.alpha = self.log_alpha.exp()
 
     def save_model(self, path, name):
-        torch.save(self.actor.state_dict(), os.path.join(path, f'{name}_actor.pt'))
-        torch.save(self.Q.state_dict(), os.path.join(path, f'{name}_Q.pt'))
+        torch.save(self.actor.state_dict(), os.path.join(path, f"{name}_actor.pt"))
+        torch.save(self.Q.state_dict(), os.path.join(path, f"{name}_Q.pt"))
 
     def load_model(self, path, name=None):
-        head = ''
+        head = ""
         if name is not None:
-            head = name + '_'
-        self.actor.load_state_dict(torch.load(os.path.join(path, f'{head}actor.pt'), map_location=self.device))
-        self.Q.load_state_dict(torch.load(os.path.join(path, f'{head}Q.pt'), map_location=self.device))
+            head = name + "_"
+        self.actor.load_state_dict(torch.load(os.path.join(path, f"{head}actor.pt"), map_location=self.device))
+        self.Q.load_state_dict(torch.load(os.path.join(path, f"{head}Q.pt"), map_location=self.device))
