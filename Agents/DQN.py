@@ -1,4 +1,4 @@
-from Agents.l2rpn_base_agent import L2rpnAgent
+from Agents.l2rpn_base_agent import SingleAgent
 from NeuralNetworks.models import DeepQNetwork, DeepQNetwork2
 import torch.optim as optim
 import torch.nn.functional as F
@@ -9,7 +9,7 @@ import os
 from torch_geometric.data import Data
 
 
-class DQN(L2rpnAgent):
+class DQN(SingleAgent):
     def create_DLA(self, **kwargs):
         super().create_DLA(**kwargs)
         self.epsilon = kwargs.get("epsilon", 0.1)
