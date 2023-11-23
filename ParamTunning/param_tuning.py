@@ -238,7 +238,7 @@ def objective(trial: optuna.Trial) -> float:
 
     # make directories
     my_dir = args.dir if args.dir else "."
-    output_result_dir = os.path.join(os.path.join(my_dir, "../result"), f"{args.name}_{args.agent}_tuning")
+    output_result_dir = os.path.join(os.path.join(my_dir, "result"), f"{args.name}_{args.agent}_tuning")
     trial_path = f"trial_{trial.number}"
     output_result_dir, model_path = make_dirs(trial_path, output_result_dir)
 
