@@ -1,0 +1,11 @@
+image: continuumio/miniconda3:latest
+
+before_script:
+  - export PIP_CACHE_DIR="/opt/cache/pip"
+  - conda env create -f environment.yml
+  - source activate MARL2023paper_env
+
+tests:
+  stage: test
+  script:
+    - python test.py -n=case_5 -a='ppo' -s=0 -c=5 
