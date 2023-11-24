@@ -321,7 +321,7 @@ class TrainAgent(object):
             scores.insert(0, scores.pop())
         return result, stats, scores, steps
 
-    def my_evaluate(self, chronics, max_ffw, path, sample=False):
+    def evaluate(self, chronics, max_ffw, path, sample=False):
         result = {}
         steps, scores = [], []
         if sample:
@@ -432,123 +432,6 @@ class TrainAgent(object):
             "score": val_score / len(chronics),
             "reward": val_rew / len(chronics),
         }
-        return stats, scores, steps
-
-    def evaluate(self, chronics, max_ffw, fig_path, mode="best", plot_topo=False):
-        if plot_topo:
-            from grid2op.PlotGrid import PlotMatplot
-
-            plot_helper = PlotMatplot(
-                self.test_env.observation_space,
-                width=1280,
-                height=1280,
-                sub_radius=7.5,
-                gen_radius=2.5,
-                load_radius=2.5,
-            )
-            self.test_env.attach_renderer()
-        result = {}
-        steps, scores = [], []
-
-        if max_ffw == 5:
-            chronics = chronics * 5
-        for idx, chron_id in enumerate(chronics):
-            if max_ffw == 5:
-                ffw = idx
-            else:
-                ffw = int(
-                    np.argmin(
-                        [
-                            self.dn_ffw[(chron_id, fw)][0]
-                            for fw in range(max_ffw)
-                            if (chron_id, fw) in self.dn_ffw and self.dn_ffw[(chron_id, fw)][0] >= 10
-                        ]
-                    )
-                )
-
-            dn_step = self.dn_ffw[(chron_id, ffw)][0]
-            self.test_env.seed(59)
-            self.test_env.set_id(chron_id)
-            obs = self.test_env.reset()
-            self.agent.reset(obs)
-
-            if ffw > 0:
-                self.test_env.fast_forward_chronics(ffw * 288 - 3)
-                obs, *_ = self.test_env.step(self.test_env.action_space())
-
-            total_reward = 0
-            alive_frame = 0
-            done = False
-            topo_dist = []
-
-            result[(chron_id, ffw)] = {}
-            bus_goal = None
-            while not done:
-                if plot_topo:
-                    danger = not self.agent.is_safe(obs)
-                    if self.agent.save and danger:
-                        temp_acts = []
-                        temp_obs = [obs]
-                        bus_goal = np.where(self.agent.goal > self.agent.bus_thres, 2, 1)
-                        prev_topo = obs.topo_vect[self.agent.converter.sub_mask]
-                        prev_step = alive_frame
-                    topo_dist.append(float((obs.topo_vect == 2).sum()))
-                act = self.agent.act(obs, 0, 0)
-                obs, reward, done, info = self.test_env.step(act)
-                total_reward += reward
-                alive_frame += 1
-                if plot_topo:
-                    if bus_goal is not None:
-                        temp_acts.append(act)
-                        temp_obs.append(obs)
-                        if self.agent.is_safe(obs) and len(self.agent.low_actions) == 0:
-                            # if (np.sum([a == self.test_env.action_space() for a in temp_acts]) < len(temp_acts) -1) and alive_frame - prev_step > 1:
-                            temp_topo = obs.topo_vect[self.agent.converter.sub_mask]
-                            print("Prev:", prev_topo)
-                            print("Goal:", bus_goal)
-                            print("Topo:", temp_topo)
-                            for i in range(len(temp_obs)):
-                                fig = plot_helper.plot_obs(temp_obs[i], line_info="rho", load_info=None, gen_info=None)
-                                fig.savefig(f"{idx}_{alive_frame}_obs{i}.pdf")
-                            print(prev_step, alive_frame - prev_step, (prev_topo != temp_topo).sum())
-                            bus_goal = None
-                            temp_acts = []
-
-                if alive_frame == 864:
-                    done = True
-
-            l2rpn_score = float(self.compute_episode_score(chron_id, alive_frame, total_reward, ffw))
-
-            print(f"[Test Ch{chron_id:4d}({ffw:2d})] {alive_frame:3d}/864 ({dn_step:3d}) Score: {l2rpn_score:9.4f}")
-            scores.append(l2rpn_score)
-            steps.append(alive_frame)
-
-            result[(chron_id, ffw)]["real_reward"] = total_reward
-            result[(chron_id, ffw)]["reward"] = l2rpn_score
-            result[(chron_id, ffw)]["step"] = alive_frame
-
-            # plot topo dist
-            if plot_topo:
-                plt.figure(figsize=(8, 6))
-                plt.plot(np.arange(len(topo_dist)), topo_dist)
-                plt.savefig(os.path.join(fig_path, f"{mode}_{idx}_topo.png"))
-                np.save(os.path.join(fig_path, f"{mode}_{idx}_topo.npy"), np.array(topo_dist))
-
-        val_step = val_score = val_rew = 0
-        for key in result:
-            val_step += result[key]["step"]
-            val_score += result[key]["reward"]
-            val_rew += result[key]["real_reward"]
-
-        stats = {
-            "step": val_step / len(chronics),
-            "score": val_score / len(chronics),
-            "reward": val_rew / len(chronics),
-        }
-        if plot_topo:
-            with open(os.path.join(fig_path, f"{mode}_{stats['score']:.3f}.txt"), "w") as f:
-                f.write(str(stats))
-                f.write(str(result))
         return stats, scores, steps
 
 

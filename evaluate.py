@@ -103,7 +103,7 @@ if __name__ == "__main__":
         if not os.path.exists(agent_dir):
             os.makedirs(agent_dir)
 
-        stats, scores, steps = trainer.my_evaluate(test_chronics, MAX_FFW[args.case], agent_dir, args.sample)
+        stats, scores, steps = trainer.evaluate(test_chronics, MAX_FFW[args.case], agent_dir, args.sample)
         # mode, plot_topo=True)
         with open(os.path.join(agent_dir, "eval_score.csv"), "a", newline="") as cf:
             csv.writer(cf).writerow(scores)
