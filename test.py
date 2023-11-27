@@ -158,12 +158,12 @@ def cli():
             "sac2",
             "sacd",
             "sacd2",
-            "masacd",
+            "isacd",
             "dsacd",
             "dqn",
             "dqn2",
             "ppo",
-            "mappo",
+            "ippo",
             "dppo",
         ],
     )
@@ -185,7 +185,7 @@ def cli():
     )
     parser.add_argument("-nh", "--n_history", type=int, default=6, help="length of frame stack")
     parser.add_argument("-do", "--dropout", type=float, default=0.0)
-    parser.add_argument("-nl", "--n_layers", type=int, default=1)
+    parser.add_argument("-nl", "--n_layers", type=int, default=3)
 
     parser.add_argument("-lr", "--lr", type=float, default=5e-3)
     parser.add_argument("-g", "--gamma", type=float, default=0.995)

@@ -8,4 +8,9 @@ before_script:
 tests:
   stage: test
   script:
-    - python test.py -n=case_5 -a='ppo' -s=0 -c=5 
+    - python test.py -n=case_5 -a='ppo' -s=0 -c=5
+    - python test.py -n=case_5 -a='ippo' -s=0 -c=5
+    - python test.py -n=case_5 -a='dppo' -s=0 -c=5
+    - python test.py -n=case_5 -a='sacd' -s=0 -c=5
+    - python test.py -n=case_5 -a='isacd' -s=0 -c=5
+    - python test.py -n=case_5 -a='dsacd' -s=0 -c=5
