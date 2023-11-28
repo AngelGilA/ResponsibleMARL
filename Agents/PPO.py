@@ -3,22 +3,107 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions import Categorical
 import os
+import numpy as np
 from grid2op.Action import BaseAction
 
-from MultiAgents.MAPPO import create_critic_actor, PPOMemory
 from Agents.l2rpn_base_agent import SingleAgent
+from Agents.BaseAgent import MyBaseAgent
+from NeuralNetworks.models import CriticNetwork, ActorEmb, Actor
 
 
-class PPO(SingleAgent):
-    """
-    Single agent PPO
-    """
+def create_critic_actor(
+    input_dim, state_dim, nheads, node_num, action_dim, dropout, num_layers=3, expand_hidden_layer=True
+):
+    # use different nn for critic and actor
+    critic = CriticNetwork(input_dim, state_dim, nheads, node_num, dropout=dropout, num_layers=num_layers)
+    if expand_hidden_layer:
+        actor = Actor(input_dim, state_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
+    else:
+        actor = ActorEmb(input_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
+    return critic, actor
 
-    def __init__(self, env, **kwargs):
-        super().__init__(env, **kwargs)
+
+class PPOMemory:
+    def __init__(self):
+        self.states = []
+        self.adj = []
+        self.actions = []
+        self.logprobs = []
+        self.vals = []
+        self.next_states = []
+        self.next_adj = []
+        self.rewards = []
+        self.dones = []
+        self.steps = []
+
+    def generate_batches(self, batch_size):
+        n_states = len(self.states)
+        batch_start = np.arange(0, n_states, batch_size)
+        indices = np.arange(n_states, dtype=np.int64)
+        np.random.shuffle(indices)
+        batches = [indices[i : i + batch_size] for i in batch_start]
+
+        return (
+            self.states,
+            self.adj,
+            self.actions,
+            self.logprobs,
+            self.vals,
+            self.next_states,
+            self.next_adj,
+            self.rewards,
+            self.dones,
+            self.steps,
+            batches,
+        )
+
+    def append(
+        self,
+        state,
+        adj,
+        action,
+        log_prob,
+        value,
+        next_state,
+        next_adj,
+        reward,
+        done,
+        steps,
+    ):
+        self.states.append(state)
+        self.adj.append(adj)
+        self.actions.append(action)
+        self.logprobs.append(log_prob)
+        self.vals.append(value)
+        self.next_states.append(next_state)
+        self.next_adj.append(next_adj)
+        self.rewards.append(reward)
+
+        self.dones.append(done)
+        self.steps.append(steps)
+
+    def __len__(self):
+        return len(self.rewards)
+
+    def clear_memory(self):
+        del self.states[:]
+        del self.adj[:]
+        del self.actions[:]
+        del self.logprobs[:]
+        del self.vals[:]
+        del self.next_states[:]
+        del self.next_adj[:]
+        del self.rewards[:]
+        del self.dones[:]
+        del self.steps[:]
+
+
+class BasePPO(MyBaseAgent):
+    def __init__(self, input_dim, action_dim, node_num, **kwargs):
         self.policy_clip = kwargs.get("epsilon", 0.2)
         self.gae_lambda = kwargs.get("lambda", 0.95)
         self.entropy_ceoff = kwargs.get("entropy", 0.001)
+        super().__init__(input_dim, action_dim, node_num, **kwargs)
 
     def create_DLA(self, **kwargs):
         self.memory = PPOMemory()
@@ -76,71 +161,28 @@ class PPO(SingleAgent):
         self.log_prob = cache["log_prob"]
         self.value = cache["value"]
 
-    def agent_act(self, obs, is_safe, sample) -> BaseAction:
-        # generate action if not safe
-        if not is_safe:
-            with torch.no_grad():
-                stacked_state = self.get_current_state().to(self.device)
-                adj = self.adj.unsqueeze(0)
-                goal = self.produce_action(stacked_state, adj, sample=sample)
-                if sample:
-                    goal, log_prob, value = goal
-                    self.update_goal(goal, log_prob, value)
-                return self.action_converter.plan_act(goal, obs.topo_vect)
-        else:
-            return self.action_space()
-
-    def save_start_transition(self):
-        super().save_start_transition()
-        self.start_log_prob = self.log_prob
-        self.start_value = self.value
-
-    def update_goal(self, goal, log_prob=None, value=None):
-        super().update_goal(goal)
-        self.log_prob = log_prob
-        self.value = value
-
-    def save_transition(self, reward, done, n_step=1):
-        self.agent_step += 1
-        next_state = self.get_current_state()
-        next_adj = self.adj.clone()
-        self.memory.append(
-            self.start_state,
-            self.start_adj,
-            self.start_goal,
-            self.start_log_prob,
-            self.start_value,
-            reward,
-            next_state,
-            next_adj,
-            int(done),
-            n_step,
-        )
-
-    def produce_action(self, state, adj, sample=True):
-        """Given the state, produces an action, the probability of the action, the log probability of the action, and
-        the argmax action"""
-        state_x, state_t = state[..., :-1], state[..., -1:]
+    def produce_action(self, stacked_state, adj, learn=False, sample=True):
+        """
+        Given the state, produces an action, the probability of the action, the log probability of the action, and
+        the argmax action
+        """
+        state_x, state_t = stacked_state[..., :-1], stacked_state[..., -1:]
         actor_input = [state_x, state_t.squeeze(-1)]
         action_probs = self.actor(actor_input, adj)
         if sample:
             action_probs = Categorical(action_probs.squeeze(0))
             action = action_probs.sample()
-            value = self.critic(state_x, adj)
-            log_prob = action_probs.log_prob(action)
-            return (action, log_prob, value)
+            # update current value and log_prob
+            self.value = self.critic(state_x, adj)
+            self.log_prob = action_probs.log_prob(action)
+            return action
         else:
             return action_probs.argmax()  # TODO: use top N actions with prob
 
-    def evaluate_action(self, state, adj, action):
-        state_x, state_t = state[..., :-1], state[..., -1:]
-        value = self.new_critic(state_x, adj)
-        actor_input = [state_x, state_t.squeeze(-1)]
-        action_probs = self.new_actor(actor_input, adj)
-        action_probs = Categorical(action_probs.squeeze(0))
-        log_prob = action_probs.log_prob(action)
-        dist_entropy = action_probs.entropy()
-        return value.squeeze(), log_prob, dist_entropy
+    def save_start_transition(self):
+        super().save_start_transition()
+        self.start_log_prob = self.log_prob
+        self.start_value = self.value
 
     def get_next_values(self, next_states, next_adj):
         with torch.no_grad():
@@ -169,6 +211,11 @@ class PPO(SingleAgent):
         next_values = self.get_next_values(next_states, next_adj)
         # Advantages
         advantages = self.compute_gae(values, rewards, dones, next_values, steps)
+        self.update_critic_actor(advantages, states, adj, actions, log_probs, values, batches)
+
+        self.memory.clear_memory()
+
+    def update_critic_actor(self, advantages, states, adj, actions, log_probs, values, batches):
         states = torch.cat(states, 0).to(self.device)
         adj = torch.stack(adj, 0).to(self.device)
         actions = torch.stack(actions, 0).to(self.device)
@@ -213,7 +260,16 @@ class PPO(SingleAgent):
 
         self.actor.load_state_dict(self.new_actor.state_dict())
         self.critic.load_state_dict(self.new_critic.state_dict())
-        self.memory.clear_memory()
+
+    def evaluate_action(self, state, adj, action):
+        state_x, state_t = state[..., :-1], state[..., -1:]
+        value = self.new_critic(state_x, adj)
+        actor_input = [state_x, state_t.squeeze(-1)]
+        action_probs = self.new_actor(actor_input, adj)
+        action_probs = Categorical(action_probs.squeeze(0))
+        log_prob = action_probs.log_prob(action)
+        dist_entropy = action_probs.entropy()
+        return value.squeeze(), log_prob, dist_entropy
 
     def compute_gae(self, values, rewards, dones, next_values, steps):
         # GAE: generalized advantage estimation
@@ -230,14 +286,57 @@ class PPO(SingleAgent):
 
     def save_model(self, path, name):
         torch.save(self.actor.state_dict(), os.path.join(path, f"{name}_actor.pt"))
-        torch.save(self.critic.state_dict(), os.path.join(path, f"{name}_critic.pt"))
+        torch.save(self.critic.state_dict(), os.path.join(path, f"{name}_emb.pt"))
 
     def load_model(self, path, name=None):
         head = ""
         if name is not None:
             head = name + "_"
+        pass
         self.new_actor.load_state_dict(torch.load(os.path.join(path, f"{head}actor.pt"), map_location=self.device))
-        self.new_critic.load_state_dict(torch.load(os.path.join(path, f"{head}critic.pt"), map_location=self.device))
+        self.new_critic.load_state_dict(torch.load(os.path.join(path, f"{head}actor.pt"), map_location=self.device))
 
         self.actor.load_state_dict(self.new_actor.state_dict())
         self.critic.load_state_dict(self.new_critic.state_dict())
+
+
+class PPO(SingleAgent, BasePPO):
+    """
+    Single agent PPO
+    """
+
+    def __init__(self, env, **kwargs):
+        super().__init__(env, **kwargs)
+        BasePPO.__init__(self, self.input_dim, self.action_dim, self.node_num, **kwargs)
+
+    def agent_act(self, obs, is_safe, sample) -> BaseAction:
+        # generate action if not safe
+        if not is_safe:
+            with torch.no_grad():
+                stacked_state = self.get_current_state().to(self.device)
+                adj = self.adj.unsqueeze(0)
+                goal = self.produce_action(stacked_state, adj, sample=sample)
+                if sample:
+                    self.update_goal(goal)
+                return self.action_converter.plan_act(goal, obs.topo_vect)
+        else:
+            return self.action_space()
+
+    def save_start_transition(self):
+        super().save_start_transition()
+        BasePPO.save_start_transition(self)
+
+    def save_transition(self, reward, done, n_step=1):
+        next_state, next_adj = super().save_transition(reward, done)
+        self.memory.append(
+            self.start_state,
+            self.start_adj,
+            self.start_goal,
+            self.start_log_prob,
+            self.start_value,
+            reward,
+            next_state,
+            next_adj,
+            int(done),
+            n_step,
+        )

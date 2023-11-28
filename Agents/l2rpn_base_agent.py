@@ -48,11 +48,6 @@ class L2rpnAgent(BaseAgent):
         # by default use simple discrete action converter
         return SimpleDiscActionConverter(env, mask, mask_hi)
 
-    @abstractmethod
-    def create_DLA(self, **kwargs):
-        # function that creates the deep learning part of the agent / algorithm.
-        self.memory = ReplayBuffer(max_size=self.memlen)
-
     def is_safe(self, obs):
         for ratio, limit in zip(obs.rho, self.thermal_limit):
             # Seperate big line and small line
@@ -196,18 +191,7 @@ class L2rpnAgent(BaseAgent):
         self.agent_step += 1
         next_state = self.get_current_state()
         next_adj = self.adj.clone()
-        self.memory.append(
-            (
-                self.start_state,
-                self.start_adj,
-                self.start_goal,
-                reward,
-                next_state,
-                next_adj,
-                int(done),
-                n_step,
-            )
-        )
+        return next_state, next_adj
 
     def check_start_update(self):
         return len(self.memory) >= self.update_start
@@ -234,45 +218,6 @@ class L2rpnAgent(BaseAgent):
             steps.to(self.device),
         )
 
-    @abstractmethod
-    def update(self):
-        self.update_step += 1
-        batch = self.memory.sample(self.batch_size)
-        (
-            stacked_states,
-            adj,
-            actions,
-            rewards,
-            stacked_states2,
-            adj2,
-            dones,
-            steps,
-        ) = self.unpack_batch(batch)
-
-        stacked_t, stacked_x = stacked_states[..., -1:], stacked_states[..., :-1]
-        stacked2_t, stacked2_x = stacked_states2[..., -1:], stacked_states2[..., :-1]
-
-        return (
-            stacked_t,
-            stacked_x,
-            adj,
-            actions,
-            rewards,
-            stacked2_t,
-            stacked2_x,
-            adj2,
-            dones,
-            steps,
-        )
-
-    @abstractmethod
-    def save_model(self, path, name):
-        pass
-
-    @abstractmethod
-    def load_model(self, path, name=None):
-        pass
-
 
 class SingleAgent(L2rpnAgent):
     def __init__(self, env, **kwargs):
@@ -286,6 +231,7 @@ class SingleAgent(L2rpnAgent):
 
         # print(f'N: {self.node_num}, O: {self.input_dim}, S: {self.state_dim}, A: {self.action_dim}')
         # create deep learning part of the agent
-        self.create_DLA(**kwargs)
+
+        # self.create_DLA(**kwargs)
 
     pass

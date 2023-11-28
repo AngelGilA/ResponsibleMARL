@@ -1,10 +1,10 @@
 import torch
 from grid2op.Action import BaseAction
 
-
 from Agents.l2rpn_base_agent import L2rpnAgent
-from MultiAgents.MASACD import BaseSacd, DependentSacd, BaseSacdSharedLayer
-from MultiAgents.MAPPO import BasePPO, DependentPPO
+from Agents.PPO import BasePPO
+from MultiAgents.MASACD import BaseSacd, DependentSacd
+from MultiAgents.MAPPO import DependentPPO
 from MultiAgents.MAconverters import MADiscActionConverter
 from MultiAgents.MiddleAgent import RuleBasedSubPicker, RandomOrderedSubPicker, FixedSubPicker
 
@@ -13,7 +13,7 @@ AGENT = {
     "ippo": BasePPO,
     "dsacd": DependentSacd,
     "dppo": DependentPPO,
-    "sharedsacd": BaseSacdSharedLayer,
+    # "sharedsacd": BaseSacdSharedLayer,
 }
 
 MIDDLE_AGENT = {

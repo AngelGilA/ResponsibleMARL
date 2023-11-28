@@ -1,8 +1,6 @@
 import torch
 from abc import abstractmethod, ABC
 
-from util import ReplayBuffer
-
 
 class MyBaseAgent(ABC):
     def __init__(self, input_dim, action_dim, node_num, **kwargs):
@@ -16,8 +14,6 @@ class MyBaseAgent(ABC):
 
         self.gamma = kwargs.get("gamma", 0.99)
         self.dropout = kwargs.get("dropout", 0.0)
-        self.memlen = kwargs.get("memlen", int(1e5))
-        self.memory = ReplayBuffer(max_size=self.memlen)
         self.batch_size = kwargs.get("batch_size", 128)
         self.actor_lr = self.critic_lr = kwargs.get("lr", 5e-5)
 
@@ -68,12 +64,8 @@ class MyBaseAgent(ABC):
     def save_start_transition(self):
         pass
 
-    def save_transition(
-        self, start_state, start_adj, action, reward, next_state, next_adj, done, n_step
-    ):
-        self.memory.append(
-            (start_state, start_adj, action, reward, next_state, next_adj, done, n_step)
-        )
+    def save_transition(self, start_state, start_adj, action, reward, next_state, next_adj, done, n_step):
+        self.memory.append((start_state, start_adj, action, reward, next_state, next_adj, done, n_step))
 
     @abstractmethod
     def update(self):

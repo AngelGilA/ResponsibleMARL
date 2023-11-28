@@ -13,7 +13,7 @@ from grid2op.Reward import L2RPNSandBoxScore
 from custom_reward import *
 from MultiAgents.MultiAgent import IMARL, DepMARL
 from Agents.sac import SAC, SMAAC
-from Agents.SACD import SacdGoal, SacdSimple, SacdShared
+from Agents.SACD import SacdGoal, SacdSimple, SacdEmb
 from Agents.DQN import DQN, DQN2
 from Agents.PPO import PPO
 from train import TrainAgent, Train
@@ -52,7 +52,7 @@ def get_agent(agent_name):
         "sac": SMAAC,
         "sac2": SAC,
         "sacd": SacdSimple,
-        "sacd_emb": SacdShared,
+        "sacd_emb": SacdEmb,
         "sacd2": SacdGoal,
         "isacd": IMARL,
         "dqn": DQN,
@@ -153,7 +153,7 @@ def cli():
         "-a",
         "--agent",
         type=str,
-        default="ppo",
+        default="dppo",
         choices=[
             "sac",
             "sac2",
