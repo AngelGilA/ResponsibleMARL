@@ -131,35 +131,34 @@ class EncoderLayer(nn.Module):
 
 
 class SoftQ(nn.Module):
-    def __init__(self, state_dim, nheads, node_num, action_dim, dropout=0, init_w=3e-3):
+    def __init__(self, state_dim, nheads, node_num, action_dim, dropout=0, num_layers=1):
         super(SoftQ, self).__init__()
-        self.gat1 = GATLayer(state_dim, nheads, dropout)
+        self.layers = nn.ModuleList()
+        for l_idx in range(num_layers):
+            self.layers.append(GATLayer(state_dim, nheads, dropout))
         self.down = nn.Linear(state_dim, 1)
         hidden_dim = node_num // 4
         self.out = nn.Linear(node_num, hidden_dim)
         self.out2 = nn.Linear(hidden_dim, action_dim)
 
     def forward(self, x, adj):
-        x = self.gat1(x, adj)
+        for l in self.layers:
+            x = l(x, adj)
         x = self.down(x).squeeze(-1)  # B,N
         x = F.leaky_relu(self.out(x))
         x = self.out2(x)
         return x
 
 
-class DoubleSoftQ(nn.Module):
-    def __init__(self, output_dim, nheads, node_num, action_dim, dropout=0, init_w=3e-3):
-        super(DoubleSoftQ, self).__init__()
-        # self.dims = tuple(np.append(-1, action_dim))
-        # action_dim = np.prod(action_dim)
-        self.Q1 = SoftQ(output_dim, nheads, node_num, action_dim, dropout, init_w)
-        self.Q2 = SoftQ(output_dim, nheads, node_num, action_dim, dropout, init_w)
+class DoubleSoftQEmb(nn.Module):
+    def __init__(self, output_dim, nheads, node_num, action_dim, dropout=0, num_layers=1):
+        super(DoubleSoftQEmb, self).__init__()
+        self.Q1 = SoftQ(output_dim, nheads, node_num, action_dim, dropout, num_layers=num_layers)
+        self.Q2 = SoftQ(output_dim, nheads, node_num, action_dim, dropout, num_layers=num_layers)
 
     def forward(self, x, adj):
         q1 = self.Q1(x, adj)
         q2 = self.Q2(x, adj)
-        # q1 = q1.reshape(self.dims)
-        # q2 = q2.reshape(self.dims)
         return q1, q2
 
     def min_Q(self, x, adj):
@@ -167,10 +166,19 @@ class DoubleSoftQ(nn.Module):
         return torch.min(q1, q2)
 
 
-class Actor(nn.Module):
-    def __init__(self, output_dim, nheads, node, action_dim, dropout=0, init_w=3e-3, num_layers=3):
-        # action_dim = np.sum(action_dim)
-        super(Actor, self).__init__()
+class DoubleSoftQ(DoubleSoftQEmb):
+    def __init__(self, input_dim, state_dim, nheads, node_num, action_dim, dropout=0, num_layers=3):
+        super().__init__(state_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
+        self.linear = nn.Linear(input_dim, state_dim)
+
+    def forward(self, x, adj):
+        x = self.linear(x)
+        return super().forward(x, adj)
+
+
+class ActorEmb(nn.Module):
+    def __init__(self, output_dim, nheads, node, action_dim, dropout=0, num_layers=3):
+        super(ActorEmb, self).__init__()
         self.layers = nn.ModuleList()
         for l_idx in range(num_layers):
             self.layers.append(GATLayer(output_dim, nheads, dropout))
@@ -187,14 +195,26 @@ class Actor(nn.Module):
         x = F.leaky_relu(x)
         mu = self.mu(x)
         probs = mu.softmax(dim=1)
-        # split_mu = mu.split(self.split_sizes, dim=1)
-        # probs = [t.softmax(dim=1) for t in split_mu]
-        # probs = torch.cat(probs, dim=1)
         return probs
 
 
+class Actor(ActorEmb):
+    def __init__(self, input_dim, output_dim, nheads, node, action_dim, dropout=0, num_layers=3):
+        super().__init__(output_dim, nheads, node, action_dim, dropout=dropout, num_layers=num_layers)
+        self.linear = nn.Linear(input_dim, output_dim)
+
+    def forward(self, x, adj):
+        x, t = x
+        x = [self.linear(x), t]
+        return super().forward(x, adj)
+
+
 class DeepQNetwork(nn.Module):
-    def __init__(self, input_dim, state_dim, nheads, node_num, action_dim, dropout=0, init_w=3e-3, num_layers=3):
+    """
+    This NN is used for the algorithms DQN and the critic in PPO
+    """
+
+    def __init__(self, input_dim, state_dim, nheads, node_num, action_dim, dropout=0, num_layers=3):
         super(DeepQNetwork, self).__init__()
         self.linear = nn.Linear(input_dim, state_dim)
         self.layers = nn.ModuleList()
@@ -219,7 +239,11 @@ class DeepQNetwork(nn.Module):
 
 
 class DeepQNetwork2(nn.Module):
-    def __init__(self, input_dim, state_dim, nheads, node_num, action_dim, dropout=0, init_w=3e-3, num_layers=3):
+    """
+    Using the new implementation of GAT
+    """
+
+    def __init__(self, input_dim, state_dim, nheads, node_num, action_dim, dropout=0, num_layers=3):
         super().__init__()
         self.linear = nn.Linear(input_dim, state_dim)
         self.layers = nn.ModuleList()

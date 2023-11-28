@@ -6,7 +6,7 @@ import numpy as np
 import os
 
 
-from NeuralNetworks.models import DoubleSoftQ, Actor, EncoderLayer
+from NeuralNetworks.models import DoubleSoftQEmb, ActorEmb, EncoderLayer
 from MultiAgents.BaseAgent import MyBaseAgent
 
 
@@ -61,9 +61,13 @@ class BaseSacd(MyBaseAgent):
 
     def create_critic_actor(self):
         # use different nn for critic and actor
-        self.Q = DoubleSoftQ(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(self.device)
-        self.tQ = DoubleSoftQ(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(self.device)
-        self.actor = Actor(self.state_dim, self.nheads, self.node_num, self.action_dim).to(self.device)
+        self.Q = DoubleSoftQEmb(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(
+            self.device
+        )
+        self.tQ = DoubleSoftQEmb(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(
+            self.device
+        )
+        self.actor = ActorEmb(self.state_dim, self.nheads, self.node_num, self.action_dim).to(self.device)
 
     def def_target_entropy(self):
         # we set the max possible entropy as the target entropy

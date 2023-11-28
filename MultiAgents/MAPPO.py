@@ -6,13 +6,18 @@ import os
 import numpy as np
 
 from MultiAgents.BaseAgent import MyBaseAgent
-from NeuralNetworks.models import CriticNetwork, Actor
+from NeuralNetworks.models import CriticNetwork, ActorEmb, Actor
 
 
-def create_critic_actor(input_dim, state_dim, nheads, node_num, action_dim, dropout, num_layers=3):
+def create_critic_actor(
+    input_dim, state_dim, nheads, node_num, action_dim, dropout, num_layers=3, expand_hidden_layer=True
+):
     # use different nn for critic and actor
     critic = CriticNetwork(input_dim, state_dim, nheads, node_num, dropout=dropout, num_layers=num_layers)
-    actor = Actor(input_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
+    if expand_hidden_layer:
+        actor = Actor(input_dim, state_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
+    else:
+        actor = ActorEmb(input_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
     return critic, actor
 
 
