@@ -233,7 +233,7 @@ def cli():
     # PPO parameters
     parser.add_argument("-ep", "--epsilon", type=float, default=0.2, help="clipping ratio for PPO")
     parser.add_argument("-en", "--entropy", type=float, default=0.01)
-    parser.add_argument("-l", "--lambda", type=float, default=0.95)
+    parser.add_argument("-l", "--lambda", type=float, default=0.95, help="GAE parameter PPO")
 
     args = parser.parse_args()
     return args
