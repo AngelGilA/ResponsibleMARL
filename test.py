@@ -154,7 +154,7 @@ def cli():
         "-a",
         "--agent",
         type=str,
-        default="dsacd_emb",
+        default="sacd_emb",
         choices=[
             "sac",
             "sac2",

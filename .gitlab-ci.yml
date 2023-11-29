@@ -12,6 +12,7 @@ tests:
     - python test.py -n=case_5 -a='ippo' -s=0 -c=5
     - python test.py -n=case_5 -a='dppo' -s=0 -c=5
     - python test.py -n=case_5 -a='sacd' -s=0 -c=5
+    - python test.py -n=case_5 -a='sacd_emb' -s=0 -c=5
     - python test.py -n=case_5 -a='isacd_base' -s=0 -c=5
     - python test.py -n=case_5 -a='isacd_emb' -s=0 -c=5
     - python test.py -n=case_5 -a='dsacd_emb' -s=0 -c=5
