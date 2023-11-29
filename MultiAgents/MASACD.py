@@ -11,6 +11,7 @@ from Agents.SACD import BaseSacd, SacdShared
 class DependentSacd(SacdShared):
     def dependent_update(self, all_agents, trans_probs):
         if len(self.memory) >= self.last_mem_len + self.update_freq:
+            self.update_step += 1
             (
                 stacked_states,
                 adj,
@@ -20,7 +21,7 @@ class DependentSacd(SacdShared):
                 adj2,
                 dones,
                 steps,
-            ) = super(BaseSacd, self).update()
+            ) = self.unpack_batch(self.memory.sample(self.batch_size))
 
             # critic loss
             Q1_loss, Q2_loss = self.get_critic_loss(

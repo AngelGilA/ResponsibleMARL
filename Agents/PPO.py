@@ -180,9 +180,22 @@ class BasePPO(MyBaseAgent):
             return action_probs.argmax()  # TODO: use top N actions with prob
 
     def save_start_transition(self):
-        super().save_start_transition()
         self.start_log_prob = self.log_prob
         self.start_value = self.value
+
+    def save_transition(self, start_state, start_adj, action, reward, next_state, next_adj, done, n_step):
+        self.memory.append(
+            start_state,
+            start_adj,
+            action,
+            self.start_log_prob,
+            self.start_value,
+            reward,
+            next_state,
+            next_adj,
+            int(done),
+            n_step,
+        )
 
     def get_next_values(self, next_states, next_adj):
         with torch.no_grad():
@@ -328,15 +341,6 @@ class PPO(SingleAgent, BasePPO):
 
     def save_transition(self, reward, done, n_step=1):
         next_state, next_adj = super().save_transition(reward, done)
-        self.memory.append(
-            self.start_state,
-            self.start_adj,
-            self.start_goal,
-            self.start_log_prob,
-            self.start_value,
-            reward,
-            next_state,
-            next_adj,
-            int(done),
-            n_step,
+        BasePPO.save_transition(
+            self, self.start_state, self.start_adj, self.start_goal, reward, next_state, next_adj, int(done), n_step
         )

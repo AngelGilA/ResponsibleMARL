@@ -65,13 +65,7 @@ class MyBaseAgent(ABC):
         pass
 
     def save_transition(self, start_state, start_adj, action, reward, next_state, next_adj, done, n_step):
-        self.memory.append((start_state, start_adj, action, reward, next_state, next_adj, done, n_step))
-
-    @abstractmethod
-    def update(self):
-        self.update_step += 1
-        batch = self.memory.sample(self.batch_size)
-        return self.unpack_batch(batch)
+        pass
 
     @abstractmethod
     def save_model(self, path, name):

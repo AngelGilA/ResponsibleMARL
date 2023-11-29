@@ -3,15 +3,17 @@ from grid2op.Action import BaseAction
 
 from Agents.l2rpn_base_agent import L2rpnAgent
 from Agents.PPO import BasePPO
-from MultiAgents.MASACD import BaseSacd, DependentSacd
+from Agents.SACD import BaseSacd, SacdShared
+from MultiAgents.MASACD import DependentSacd
 from MultiAgents.MAPPO import DependentPPO
 from MultiAgents.MAconverters import MADiscActionConverter
 from MultiAgents.MiddleAgent import RuleBasedSubPicker, RandomOrderedSubPicker, FixedSubPicker
 
 AGENT = {
-    "isacd": BaseSacd,
+    "isacd_base": BaseSacd,
+    "isacd_emb": SacdShared,
     "ippo": BasePPO,
-    "dsacd": DependentSacd,
+    "dsacd_emb": DependentSacd,
     "dppo": DependentPPO,
     # "sharedsacd": BaseSacdSharedLayer,
 }

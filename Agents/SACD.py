@@ -24,13 +24,13 @@ class BaseSacd(MyBaseAgent):
         self.embed_lr = self.alpha_lr = kwargs.get("lr", 5e-5)
         self.update_freq = kwargs.get("update_freq", 1)
 
+        super().__init__(input_dim, action_dim, node_num, **kwargs)
+
         self.memlen = kwargs.get("memlen", int(1e5))
         self.memory = ReplayBuffer(max_size=self.memlen)
         # entropy
         self.def_target_entropy()
         self.last_mem_len = 0
-
-        super().__init__(input_dim, action_dim, node_num, **kwargs)
 
     def create_DLA(self, **kwargs):
         self.create_critic_actor(num_layers=kwargs.get("n_layers", 3))
@@ -96,8 +96,12 @@ class BaseSacd(MyBaseAgent):
         else:
             return action_probs.argmax()
 
+    def save_transition(self, start_state, start_adj, action, reward, next_state, next_adj, done, n_step):
+        self.memory.append((start_state, start_adj, action, reward, next_state, next_adj, done, n_step))
+
     def update(self):
         if len(self.memory) >= self.last_mem_len + self.update_freq:
+            self.update_step += 1
             (
                 stacked_states,
                 adj,
@@ -107,7 +111,7 @@ class BaseSacd(MyBaseAgent):
                 adj2,
                 dones,
                 steps,
-            ) = super().update()
+            ) = self.unpack_batch(self.memory.sample(self.batch_size))
 
             # critic loss
             Q1_loss, Q2_loss = self.get_critic_loss(
@@ -380,17 +384,16 @@ class SacdSimple(SingleAgent, BaseSacd):
 
     def save_transition(self, reward, done, n_step=1):
         next_state, next_adj = super().save_transition(reward, done)
-        self.memory.append(
-            (
-                self.start_state,
-                self.start_adj,
-                self.start_goal,
-                reward,
-                next_state,
-                next_adj,
-                int(done),
-                n_step,
-            )
+        BaseSacd.save_transition(
+            self,
+            self.start_state,
+            self.start_adj,
+            self.start_goal,
+            reward,
+            next_state,
+            next_adj,
+            int(done),
+            n_step,
         )
 
 
