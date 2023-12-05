@@ -187,6 +187,7 @@ class L2rpnAgent(BaseAgent):
         self.goal = goal
         self.save = True
 
+    @abstractmethod
     def save_transition(self, reward, done, n_step=1):
         self.agent_step += 1
         next_state = self.get_current_state()

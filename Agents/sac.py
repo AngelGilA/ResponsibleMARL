@@ -1,7 +1,7 @@
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.distributions.normal import Normal
-from NeuralNetworks.models import SmaacDoubleSoftQ, SmaacActor
+from NeuralNetworks.GnnModels import SmaacDoubleSoftQ, SmaacActor
 from converters import *
 from grid2op.Agent import BaseAgent
 

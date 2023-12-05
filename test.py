@@ -88,7 +88,7 @@ def cli():
 
     # General env parameters
     parser.add_argument("-s", "--seed", type=int, default=0)
-    parser.add_argument("-c", "--case", type=str, default="14", choices=["14", "5"])
+    parser.add_argument("-c", "--case", type=str, default="5", choices=["14", "5"])
     parser.add_argument("-rw", "--reward", type=str, default="margin", choices=["loss", "margin"])
     parser.add_argument("-gpu", "--gpuid", type=int, default=0)
     parser.add_argument("-ml", "--memlen", type=int, default=50000)
@@ -154,7 +154,7 @@ def cli():
         "-a",
         "--agent",
         type=str,
-        default="sacd_emb",
+        default="dppo",
         choices=[
             "sac",
             "sac2",
@@ -173,6 +173,7 @@ def cli():
     )
 
     # (Deep) learning  parameters
+    parser.add_argument("-nn", "--network", type=str, default="lin")
     parser.add_argument(
         "-hn",
         "--head_number",

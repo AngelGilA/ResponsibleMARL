@@ -209,33 +209,19 @@ class Actor(ActorEmb):
         return super().forward(x, adj)
 
 
-class DeepQNetwork(nn.Module):
+class CriticNetwork(nn.Module):
     """
     This NN is used for the algorithms DQN and the critic in PPO
     """
 
-    def __init__(self, input_dim, state_dim, nheads, node_num, action_dim, dropout=0, num_layers=3):
-        super(DeepQNetwork, self).__init__()
+    def __init__(self, input_dim, state_dim, nheads, node_num, action_dim=1, dropout=0, num_layers=3):
+        super(CriticNetwork, self).__init__()
         self.linear = nn.Linear(input_dim, state_dim)
-        self.layers = nn.ModuleList()
-        for l_idx in range(num_layers):
-            self.layers.append(GATLayer(state_dim, nheads, dropout))
-        self.down = nn.Linear(state_dim, 1)
-        hidden_dim = node_num // 4
-        self.out = nn.Linear(node_num, hidden_dim)
-        self.out2 = nn.Linear(hidden_dim, action_dim)
+        self.Q = SoftQ(state_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
 
     def forward(self, x, adj):
         x = self.linear(x)
-        for l in self.layers:
-            if isinstance(l, GATLayer):
-                x = l(x, adj)
-            else:
-                x = l(x)
-        x = self.down(x).squeeze(-1)  # B,N
-        x = F.leaky_relu(self.out(x))
-        x = self.out2(x)
-        return x
+        return self.Q(x, adj)
 
 
 class DeepQNetwork2(nn.Module):
@@ -278,9 +264,3 @@ class DeepQNetwork2(nn.Module):
         x = F.leaky_relu(self.out(x))
         x = self.out2(x)
         return x
-
-
-class CriticNetwork(DeepQNetwork):
-    def __init__(self, input_dim, state_dim, nheads, node_num, dropout=0, num_layers=3):
-        action_dim = 1
-        super().__init__(input_dim, state_dim, nheads, node_num, action_dim, dropout, num_layers)

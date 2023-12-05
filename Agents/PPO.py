@@ -8,18 +8,25 @@ from grid2op.Action import BaseAction
 
 from Agents.l2rpn_base_agent import SingleAgent
 from Agents.BaseAgent import MyBaseAgent
-from NeuralNetworks.models import CriticNetwork, ActorEmb, Actor
+from NeuralNetworks.GnnModels import CriticNetwork, ActorEmb, Actor
+from NeuralNetworks.LinearModels import CriticNetwork as LinCritic, Actor as LinActor
 
 
 def create_critic_actor(
-    input_dim, state_dim, nheads, node_num, action_dim, dropout, num_layers=3, expand_hidden_layer=True
+    input_dim, state_dim, nheads, node_num, action_dim, dropout, num_layers=3, network="gnn", expand_hidden_layer=True
 ):
-    # use different nn for critic and actor
-    critic = CriticNetwork(input_dim, state_dim, nheads, node_num, dropout=dropout, num_layers=num_layers)
-    if expand_hidden_layer:
-        actor = Actor(input_dim, state_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
+    if network == "gnn":
+        # define gnn for critic and actor
+        critic = CriticNetwork(input_dim, state_dim, nheads, node_num, dropout=dropout, num_layers=num_layers)
+        if expand_hidden_layer:
+            actor = Actor(input_dim, state_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
+        else:
+            actor = ActorEmb(input_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
+    elif network == "lin":
+        critic = LinCritic(input_dim, state_dim, node_num, num_layers=num_layers)
+        actor = LinActor(input_dim, state_dim, node_num, action_dim, num_layers=num_layers)
     else:
-        actor = ActorEmb(input_dim, nheads, node_num, action_dim, dropout=dropout, num_layers=num_layers)
+        raise Exception(f"{network} is not a valid network type.")
     return critic, actor
 
 
@@ -115,6 +122,7 @@ class BasePPO(MyBaseAgent):
             self.action_dim,
             self.dropout,
             num_layers=kwargs.get("n_layers", 3),
+            network=kwargs.get("network", "gnn"),
         )
         self.actor.to(self.device)
         self.critic.to(self.device)
@@ -127,6 +135,7 @@ class BasePPO(MyBaseAgent):
             self.action_dim,
             self.dropout,
             num_layers=kwargs.get("n_layers", 3),
+            network=kwargs.get("network", "gnn"),
         )
         self.new_actor.to(self.device)
         self.new_critic.to(self.device)

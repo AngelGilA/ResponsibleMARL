@@ -9,7 +9,8 @@ from grid2op.Action import BaseAction
 
 from converters import GoalActionConverter
 from util import ReplayBuffer
-from NeuralNetworks.models import DoubleSoftQ, Actor, EncoderLayer, DoubleSoftQEmb, ActorEmb
+from NeuralNetworks.GnnModels import DoubleSoftQ, Actor, EncoderLayer, DoubleSoftQEmb, ActorEmb
+from NeuralNetworks.LinearModels import DoubleSoftQ as Lin2SoftQ, Actor as LinActor
 from Agents.l2rpn_base_agent import SingleAgent
 from Agents.BaseAgent import MyBaseAgent
 
@@ -33,7 +34,7 @@ class BaseSacd(MyBaseAgent):
         self.last_mem_len = 0
 
     def create_DLA(self, **kwargs):
-        self.create_critic_actor(num_layers=kwargs.get("n_layers", 3))
+        self.create_critic_actor(num_layers=kwargs.get("n_layers", 3), network=kwargs.get("network", "gnn"))
 
         # copy parameters
         self.tQ.load_state_dict(self.Q.state_dict())
@@ -46,29 +47,51 @@ class BaseSacd(MyBaseAgent):
         self.tQ.eval()
         self.actor.eval()
 
-    def create_critic_actor(self, num_layers=3):
-        # use different nn for critic and actor
-        self.Q = DoubleSoftQ(
-            self.input_dim,
-            self.state_dim,
-            self.nheads,
-            self.node_num,
-            self.action_dim,
-            self.dropout,
-            num_layers=num_layers,
-        ).to(self.device)
-        self.tQ = DoubleSoftQ(
-            self.input_dim,
-            self.state_dim,
-            self.nheads,
-            self.node_num,
-            self.action_dim,
-            self.dropout,
-            num_layers=num_layers,
-        ).to(self.device)
-        self.actor = Actor(
-            self.input_dim, self.state_dim, self.nheads, self.node_num, self.action_dim, num_layers=num_layers
-        ).to(self.device)
+    def create_critic_actor(self, num_layers=3, network="gnn"):
+        if network == "gnn":
+            # use different nn for critic and actor
+            self.Q = DoubleSoftQ(
+                self.input_dim,
+                self.state_dim,
+                self.nheads,
+                self.node_num,
+                self.action_dim,
+                self.dropout,
+                num_layers=num_layers,
+            ).to(self.device)
+            self.tQ = DoubleSoftQ(
+                self.input_dim,
+                self.state_dim,
+                self.nheads,
+                self.node_num,
+                self.action_dim,
+                self.dropout,
+                num_layers=num_layers,
+            ).to(self.device)
+            self.actor = Actor(
+                self.input_dim, self.state_dim, self.nheads, self.node_num, self.action_dim, num_layers=num_layers
+            ).to(self.device)
+        elif network == "lin":
+            # use different nn for critic and actor
+            self.Q = Lin2SoftQ(
+                self.input_dim,
+                self.state_dim,
+                self.node_num,
+                self.action_dim,
+                num_layers=num_layers,
+            ).to(self.device)
+            self.tQ = Lin2SoftQ(
+                self.input_dim,
+                self.state_dim,
+                self.node_num,
+                self.action_dim,
+                num_layers=num_layers,
+            ).to(self.device)
+            self.actor = LinActor(
+                self.input_dim, self.state_dim, self.node_num, self.action_dim, num_layers=num_layers
+            ).to(self.device)
+        else:
+            raise Exception(f"{network} is not a valid network type.")
 
     def def_target_entropy(self):
         # we set the max possible entropy as the target entropy

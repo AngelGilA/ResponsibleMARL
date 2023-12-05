@@ -64,6 +64,7 @@ class MyBaseAgent(ABC):
     def save_start_transition(self):
         pass
 
+    @abstractmethod
     def save_transition(self, start_state, start_adj, action, reward, next_state, next_adj, done, n_step):
         pass
 
