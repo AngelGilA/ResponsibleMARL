@@ -1,11 +1,16 @@
 image: continuumio/miniconda3:latest
 
+before_script:
+  - export PIP_CACHE_DIR="/opt/cache/pip"
+  - conda env create -f environment.yml
+  - source activate MARL2023paper_env
+
 tests:
   stage: test
   script:
-    - >
+    - |
       for network in gnn lin; do
           for agent in ppo dppo ippo; do
-            echo "Hi agent $agent"
-            echo "Hi network $network"
+             python test.py -n=case_5 -a="$agent" -s=0 -c=5 -nn="$network"
+          done
       done
