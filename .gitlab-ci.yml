@@ -8,9 +8,9 @@ before_script:
 tests:
   stage: test
   script:
-    - |+
-      - for network in ${gnn} ${lin} do
-          for agent in ${ppo} ${ippo} ${dppo} do
-            python test.py -n=case_5 -a=$agent -s=0 -c=5 -nn=$network
+    - |-
+      - for network in gnn lin; do
+          for agent in ppo ippo dppo; do
+            python test.py -n=case_5 -a="$agent" -s=0 -c=5 -nn="$network" &
           done
       done
