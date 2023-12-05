@@ -5,5 +5,7 @@ tests:
   script:
     - >
       for network in gnn lin; do
-          echo "Hello $network"
+          for agent in ppo dppo ippo; do
+            echo "Hi agent $agent"
+            echo "Hi network $network"
       done
