@@ -260,17 +260,39 @@ class SacdShared(BaseSacd):
         self.emb.eval()
         self.temb.eval()
 
-    def create_critic_actor(self, num_layers=3):
-        # use different nn for critic and actor
-        self.Q = DoubleSoftQEmb(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(
-            self.device
-        )
-        self.tQ = DoubleSoftQEmb(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(
-            self.device
-        )
-        self.actor = ActorEmb(self.state_dim, self.nheads, self.node_num, self.action_dim, num_layers=num_layers).to(
-            self.device
-        )
+    def create_critic_actor(self, num_layers=3, network="gnn"):
+        if network == "gnn":
+            # use different nn for critic and actor
+            self.Q = DoubleSoftQEmb(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(
+                self.device
+            )
+            self.tQ = DoubleSoftQEmb(self.state_dim, self.nheads, self.node_num, self.action_dim, self.dropout).to(
+                self.device
+            )
+            self.actor = ActorEmb(
+                self.state_dim, self.nheads, self.node_num, self.action_dim, num_layers=num_layers
+            ).to(self.device)
+        elif network == "lin":
+            # use different nn for critic and actor
+            self.Q = Lin2SoftQ(
+                self.state_dim,
+                self.state_dim,
+                self.node_num,
+                self.action_dim,
+                num_layers=num_layers,
+            ).to(self.device)
+            self.tQ = Lin2SoftQ(
+                self.state_dim,
+                self.state_dim,
+                self.node_num,
+                self.action_dim,
+                num_layers=num_layers,
+            ).to(self.device)
+            self.actor = LinActor(
+                self.state_dim, self.state_dim, self.node_num, self.action_dim, num_layers=num_layers
+            ).to(self.device)
+        else:
+            raise Exception(f"{network} is not a valid network type.")
 
     def produce_action(self, stacked_state, adj, learn=False, sample=True):
         """Given the state, produces an action, the probability of the action, the log probability of the action, and
