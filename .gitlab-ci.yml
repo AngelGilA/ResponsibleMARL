@@ -10,7 +10,7 @@ tests:
   script:
     - |
       for network in gnn lin; do
-          for agent in ppo dppo ippo; do
+          for agent in ppo dppo ippo sacd sacd_emb isacd_base isacd_emb dsacd_emb; do
              python test.py -n=case_5 -a="$agent" -s=0 -c=5 -nn="$network"
           done
       done
