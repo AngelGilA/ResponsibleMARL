@@ -13,7 +13,7 @@ from NeuralNetworks.LinearModels import CriticNetwork as LinCritic, Actor as Lin
 
 
 def create_critic_actor(
-    input_dim, state_dim, nheads, node_num, action_dim, dropout, num_layers=3, network="gnn", expand_hidden_layer=True
+    input_dim, state_dim, nheads, node_num, action_dim, dropout, num_layers=3, network="gnn", expand_hidden_layer=False
 ):
     if network == "gnn":
         # define gnn for critic and actor
