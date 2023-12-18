@@ -308,7 +308,7 @@ class BasePPO(MyBaseAgent):
 
     def save_model(self, path, name):
         torch.save(self.actor.state_dict(), os.path.join(path, f"{name}_actor.pt"))
-        torch.save(self.critic.state_dict(), os.path.join(path, f"{name}_emb.pt"))
+        torch.save(self.critic.state_dict(), os.path.join(path, f"{name}_critic.pt"))
 
     def load_model(self, path, name=None):
         head = ""
@@ -316,7 +316,7 @@ class BasePPO(MyBaseAgent):
             head = name + "_"
         pass
         self.new_actor.load_state_dict(torch.load(os.path.join(path, f"{head}actor.pt"), map_location=self.device))
-        self.new_critic.load_state_dict(torch.load(os.path.join(path, f"{head}actor.pt"), map_location=self.device))
+        self.new_critic.load_state_dict(torch.load(os.path.join(path, f"{head}critic.pt"), map_location=self.device))
 
         self.actor.load_state_dict(self.new_actor.state_dict())
         self.critic.load_state_dict(self.new_critic.state_dict())
