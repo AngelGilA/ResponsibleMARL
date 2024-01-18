@@ -51,6 +51,9 @@ python evaluate.py -rd=[results_directory] -mn=[model_name]
 python evaluate.py -rd=result -mn=case_5_ppo
 ```
 
+## Visualization of code
+![FlowChart of Code](/images/MARL_flowchart.png?raw=true "Flow chart of Code")
+
 ## Agent algorithms implemented
 Below the agents that are implemented are listed as: 
 
