@@ -1,6 +1,5 @@
 # Multi-Agent Reinforcement Learning for Power Grid Topology Optimization
-This repository contains the code used for the experiments of the paper 
-[Multi-Agent Reinforcement Learning for Power Grid Topology Optimization](https://doi.org/10.48550/arXiv.2310.02605).
+The code in this repository is used for research on the definition of Responsability Areas (RA) in multi-agent reinforcement learning for power grids. This work is an extension of Erica van der Sar's paper [Multi-Agent Reinforcement Learning for Power Grid Topology Optimization](https://doi.org/10.48550/arXiv.2310.02605).
 
 ## Environment setting
 - python >= 3.11  
