@@ -184,6 +184,7 @@ class BasePPO(MyBaseAgent):
             # update current value and log_prob
             self.value = self.critic(state_x, adj)
             self.log_prob = action_probs.log_prob(action)
+
             return action
         else:
             return action_probs.argmax()  # TODO: use top N actions with prob
@@ -295,6 +296,11 @@ class BasePPO(MyBaseAgent):
 
     def compute_gae(self, values, rewards, dones, next_values, steps):
         # GAE: generalized advantage estimation
+            # Check for None values in 'values' list before GAE computation
+        if any(v is None for v in values):
+            none_indices = [i for i, v in enumerate(values) if v is None]
+            raise ValueError(f"Encountered None value in 'values' list at indices: {none_indices}")
+
         advantage = torch.zeros(len(rewards))
         a_t = 0
         for t in range(len(rewards) - 1, -1, -1):

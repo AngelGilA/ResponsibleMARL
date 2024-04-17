@@ -3,7 +3,7 @@
 #SBATCH --job-name="marl_ppo_agents"
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=18
+#SBATCH --cpus-per-task=16
 #SBATCH --partition=rome
 #SBATCH --time=03:00:00
 #SBATCH --output=test_case5_ppo_m3_%j.out

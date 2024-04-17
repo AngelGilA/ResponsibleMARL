@@ -11,7 +11,7 @@ from lightsim2grid import LightSimBackend
 from grid2op.Reward import L2RPNSandBoxScore
 
 from custom_reward import *
-from MultiAgents.MultiAgent import IMARL, DepMARL
+from MultiAgents.MultiAgent import IMARL, DepMARL, ReArIMARL
 from Agents.sac import SAC, SMAAC
 from Agents.SACD import SacdGoal, SacdSimple, SacdEmb
 from Agents.DQN import DQN, DQN2
@@ -62,6 +62,7 @@ def get_agent(agent_name):
         "ppo": PPO,
         "ippo": IMARL,
         "dppo": DepMARL,
+        "raippo": ReArIMARL,
     }
     return AGENT[agent_name]
 
@@ -96,14 +97,14 @@ def cli():
         "-ns",
         "--nb_steps",
         type=int,
-        default=100,
+        default=200,
         help="total number of agent steps",
     )
     parser.add_argument(
         "-ev",
         "--eval_steps",
         type=int,
-        default=50,
+        default=100,
         help="the number of steps between each evaluation",
     )
 
@@ -114,6 +115,13 @@ def cli():
         default=3,
         help='this agent manages the substations containing topology elements over "mask"',
     )
+
+    # parser.add_argument(
+    #     "-cl", 
+    #     "--clusters", 
+    #     type=str, 
+    #     help="Optional: Path to cluster configuration file", default="")
+
     parser.add_argument("-mr", "--max_reward", type=int, default=10, help="max reward during training")
     parser.add_argument(
         "-i",
@@ -169,6 +177,7 @@ def cli():
             "ppo",
             "ippo",
             "dppo",
+            "raippo"
         ],
     )
 

@@ -3,7 +3,7 @@
 #SBATCH --job-name="marl_sac_agents"
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=18
+#SBATCH --cpus-per-task=16
 #SBATCH --partition=rome
 #SBATCH --time=06:00:00
 #SBATCH --output=test_case5_sacd_m3_%j.out

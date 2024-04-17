@@ -6,7 +6,7 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 from datetime import datetime
 
-from MultiAgents.MultiAgent import IMARL
+from MultiAgents.MultiAgent import IMARL, ReArIMARL
 
 
 class TrainAgent(object):
@@ -65,7 +65,7 @@ class TrainAgent(object):
         ep_score = np.interp(agent_reward, reward_range, score_range)
         return ep_score
 
-    def interaction(self, obs, prev_act, start_step):
+    def interaction(self, obs, prev_act, start_step):        
         self.agent.save_start_transition()
         # order = None if self.agent.order is None else self.agent.order.clone()
         reward, train_reward, step = 0, 0, 0
@@ -86,6 +86,9 @@ class TrainAgent(object):
             new_reward = info["rewards"][self.rw_func]
             train_reward += new_reward
             step += 1
+
+
+
             if start_step + step == 864:
                 done = True
             if done:
@@ -230,7 +233,7 @@ class TrainAgent(object):
             print(f"\n__________________________________\n     Training is done:\n----------------------------------")
             print(f"** Best score agent: {best_score:9.4f} **")
             print(f"The agent did {self.agent.update_step} updates in total")
-            if isinstance(self.agent, IMARL):
+            if isinstance(self.agent, IMARL) or isinstance(self.agent, ReArIMARL):
                 self.agent.print_updates_per_agent()
 
         return best_score
@@ -487,6 +490,11 @@ class Train(TrainAgent):
                     break
                 elif skip:
                     skip = False
+
+            # debugging info
+            # print("printing from train.interaction", ", step: ", step)
+            # print(act)
+
             train_reward = np.clip(train_reward, -2, self.max_rw)
             die = bool(done and info["exception"])
             self.agent.save_transition(train_reward, die, n_step=step)
