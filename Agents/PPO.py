@@ -110,6 +110,7 @@ class BasePPO(MyBaseAgent):
         self.policy_clip = kwargs.get("epsilon", 0.2)
         self.gae_lambda = kwargs.get("lambda", 0.95)
         self.entropy_ceoff = kwargs.get("entropy", 0.001)
+        self.actions = 0
         super().__init__(input_dim, action_dim, node_num, **kwargs)
 
     def create_DLA(self, **kwargs):
@@ -170,7 +171,7 @@ class BasePPO(MyBaseAgent):
         self.log_prob = cache["log_prob"]
         self.value = cache["value"]
 
-    def produce_action(self, stacked_state, adj, learn=False, sample=True):
+    def produce_action(self, stacked_state, adj, learn=False, sample=True, dn_count=0):
         """
         Given the state, produces an action, the probability of the action, the log probability of the action, and
         the argmax action
@@ -184,10 +185,13 @@ class BasePPO(MyBaseAgent):
             # update current value and log_prob
             self.value = self.critic(state_x, adj)
             self.log_prob = action_probs.log_prob(action)
-
             return action
         else:
             return action_probs.argmax()  # TODO: use top N actions with prob
+        
+            # Alternative: use top N actions in recursion until a "relevant" action is found.
+            sorted_actions = action_probs.argsort(descending=True)
+            return sorted_actions[0][dn_count]
 
     def save_start_transition(self):
         self.start_log_prob = self.log_prob
@@ -337,16 +341,23 @@ class PPO(SingleAgent, BasePPO):
         super().__init__(env, **kwargs)
         BasePPO.__init__(self, self.input_dim, self.action_dim, self.node_num, **kwargs)
 
-    def agent_act(self, obs, is_safe, sample) -> BaseAction:
+    def agent_act(self, obs, is_safe, sample, dn_count=0) -> BaseAction:
         # generate action if not safe
         if not is_safe:
             with torch.no_grad():
                 stacked_state = self.get_current_state().to(self.device)
                 adj = self.adj.unsqueeze(0)
-                goal = self.produce_action(stacked_state, adj, sample=sample)
+                goal = self.produce_action(stacked_state, adj, sample=sample, dn_count=dn_count)
+                act = self.action_converter.plan_act(goal, obs.topo_vect)
                 if sample:
                     self.update_goal(goal)
-                return self.action_converter.plan_act(goal, obs.topo_vect)
+                elif (act == self.action_space()) & (dn_count < 0):
+                    # skip DoNothing action when we are not training
+                    act = self.agent_act(obs, is_safe, sample, dn_count=dn_count + 1)
+                if act != self.action_space():
+                    self.actions += 1
+                    # print(f"Actual action: {self.actions}")
+                return act
         else:
             return self.action_space()
 

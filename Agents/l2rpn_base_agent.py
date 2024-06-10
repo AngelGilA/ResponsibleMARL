@@ -24,7 +24,7 @@ class L2rpnAgent(BaseAgent):
         self.node_num = env.dim_topo
 
         self.action_converter = self.create_action_converter(
-            env, mask, mask_hi, bus_thresh=kwargs.get("threshold", 0.1)
+            env, mask, mask_hi, bus_thresh=kwargs.get("threshold", 0.1), n_clusters=kwargs.get("n_clusters",1), cluster_method=kwargs.get("cluster_method","kmeans")
         )
         self.obs_converter = ObsConverter(env, self.danger, self.device, attr=kwargs.get("input"))
 
@@ -43,6 +43,8 @@ class L2rpnAgent(BaseAgent):
             self.input_dim += self.fc_ts
 
         # print(kwargs)
+        #self.reconnect_count = 0
+        #self.action_count = 0
 
     def create_action_converter(self, env, mask, mask_hi, **kwargs) -> SimpleDiscActionConverter:
         # by default use simple discrete action converter
@@ -148,8 +150,12 @@ class L2rpnAgent(BaseAgent):
         if False in obs.line_status:
             act = self.reconnect_line(obs)
             if act is not None:
+                #self.reconnect_count += 1
+                #print(f"Reconnect powerline: {self.reconnect_count}")
                 return act
 
+        #self.action_count += 1
+        #print(f"Agent trying to generate action: {self.action_count}")
         return self.agent_act(obs, is_safe, sample)
 
     def reconnect_line(self, obs):

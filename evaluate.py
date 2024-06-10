@@ -6,7 +6,9 @@ import torch
 
 from test import make_envs, select_chronics, make_agent, log_params
 from train import TrainAgent, Train
-
+from util import (write_depths_to_csv, write_action_counts_to_csv, write_steps_ol_to_csv, write_topologies_to_csv, 
+                write_is_safe_to_csv, write_ra_action_counts_to_csv, write_substation_configs_to_csv, write_unique_topos_total_to_csv,
+                compute_per_chronic_measures, compute_across_chronic_measures)
 import warnings
 import glob
 
@@ -102,10 +104,37 @@ if __name__ == "__main__":
 
         if not os.path.exists(agent_dir):
             os.makedirs(agent_dir)
-
-        stats, scores, steps = trainer.evaluate(test_chronics, MAX_FFW[args.case], agent_dir, args.sample)
+        
+        agent_dir = os.path.join(agent_dir, "evaluation_measures")
+        if not os.path.exists(agent_dir):
+            os.makedirs(agent_dir)
+        
+        if args.agent == "raippo":
+            stats, scores, steps, topologies, unique_topos, unique_topos_total, substation_configs, is_safe, steps_overloaded, sub_depths, elem_depths, action_counts, ra_action_counts = trainer.evaluate(test_chronics, MAX_FFW[args.case], agent_dir, args.sample)
+        else:
+            stats, scores, steps, topologies, unique_topos,  unique_topos_total, substation_configs, is_safe, steps_overloaded, sub_depths, elem_depths, action_counts = trainer.evaluate(test_chronics, MAX_FFW[args.case], agent_dir, args.sample)
         # mode, plot_topo=True)
-        with open(os.path.join(agent_dir, "eval_score.csv"), "a", newline="") as cf:
+        with open(os.path.join(agent_dir, "score.csv"), "a", newline="") as cf:
             csv.writer(cf).writerow(scores)
-        with open(os.path.join(agent_dir, "eval_step.csv"), "a", newline="") as cf:
+        with open(os.path.join(agent_dir, "step.csv"), "a", newline="") as cf:
             csv.writer(cf).writerow(steps)
+        with open(os.path.join(agent_dir, "unique_topologies_chron.csv"), "a", newline="") as cf:    
+            csv.writer(cf).writerow(unique_topos)
+
+        # dictionaries are treated differently
+        write_unique_topos_total_to_csv(unique_topos_total, os.path.join(agent_dir, "unique_topologies_total.csv"))
+        write_substation_configs_to_csv(substation_configs, os.path.join(agent_dir, "unique_substation_configurations.csv"))
+        write_topologies_to_csv(topologies, os.path.join(agent_dir, "raw_topologies.csv"))
+        write_is_safe_to_csv(is_safe, os.path.join(agent_dir, "is_safe.csv"))
+        write_steps_ol_to_csv(steps_overloaded, os.path.join(agent_dir, "steps_overloaded.csv"))
+        write_depths_to_csv(sub_depths, os.path.join(agent_dir, "sub_depths.csv"))
+        write_depths_to_csv(elem_depths, os.path.join(agent_dir, "elem_depths.csv"))
+        write_action_counts_to_csv(os.path.join(agent_dir, "action_counts.csv"), action_counts)
+
+        if args.agent == "raippo":
+            write_ra_action_counts_to_csv(os.path.join(agent_dir, "ra_action_counts.csv"), ra_action_counts)
+
+        # Compute and write summary measures
+        #chronic_ids = test_chronics  # List of chronic IDs used in evaluation
+        #compute_per_chronic_measures(agent_dir, chronic_ids)
+        #compute_across_chronic_measures(agent_dir, chronic_ids)

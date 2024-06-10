@@ -2,7 +2,7 @@ import numpy as np
 
 from converters import SimpleDiscActionConverter
 
-from ResponsibilityAreas.GroupingMethods import dummy_cluster
+from ResponsibilityAreas.GroupingMethods import perform_clustering
 
 class MADiscActionConverter(SimpleDiscActionConverter):
     def __init__(self, env, mask, mask_hi, rule="c"):
@@ -38,9 +38,7 @@ class MADiscActionConverter(SimpleDiscActionConverter):
         #print(self.n_sub_actions) [57, 29, 31, 15, 15, 5, 7]
         #print(self.sub_line_or)   [array([7, 8, 9], dtype=int64), array([2, 3, 4], dtype=int64), array([ 6, 15, 16], dtype=int64), ar
         #print(self.sub_line_ex)   [array([17], dtype=int64), array([0], dtype=int64), array([3, 5], dtype=int64), array([1, 4, 6], dtype=int64),
-
-    #
-    #      
+ 
     def plan_act(self, goal, topo_vect, **kwargs):
         sub, action = goal
         sub_i = np.flatnonzero(self.masked_sorted_sub == sub).squeeze()
@@ -52,14 +50,23 @@ class MADiscActionConverter(SimpleDiscActionConverter):
             return self.action_space()
 
 class RAMAActionConverter(SimpleDiscActionConverter):
-    def __init__(self, env, mask, mask_hi, rule="c"):
+    def __init__(self, env, mask, mask_hi, num_clusters, cluster_method, rule="c"):
+        self.num_clusters = num_clusters
+        self.cluster_method = cluster_method
+        self.node_num = len(env.action_space.sub_info)
+        self.obs = env.get_obs()
         super().__init__(env, mask, mask_hi, rule)
         self.n = 0  # not relevant for MA
+        self.current_ra = None
           
     def init_action_converter(self):
-        self.clusters = dummy_cluster(len(self.action_space.sub_info)) # New parameter for clusters e.g. [[0,2,4],[1,3]]
-        self.ra_idx = [i for i in range(len(self.clusters))] # this will substitute self.masked_sorted_sub when necessary.
-
+        sort_subs = np.argsort(-self.action_space.sub_info[self.action_space.sub_info > self.mask])
+        self.masked_sorted_sub = self.subs[sort_subs]
+        
+        # Perform clustering
+        self.clusters = perform_clustering(self.cluster_method, self.node_num, self.masked_sorted_sub, self.num_clusters, self.obs)
+        print(f"Clusters (before masking): {self.clusters}")
+        self.ra_idx = [i for i in range(len(self.clusters))] # Equivalent of self.masked_sorted_sub for RA in terms of usage.
         self.cluster_actions = []
         self.n_cluster_actions = []
 
@@ -68,10 +75,11 @@ class RAMAActionConverter(SimpleDiscActionConverter):
         for cluster in self.clusters:
             cluster_action_ids = []
             for sub in cluster:
-                sub_actions = self.action_space.get_all_unitary_topologies_set(self.action_space, sub)
-                for action in sub_actions:
-                    self.act_to_sub[str(action)] = sub
-                    cluster_action_ids.append(action)  # Actions are identifiable and unique
+                if sub in self.masked_sorted_sub:
+                    sub_actions = self.action_space.get_all_unitary_topologies_set(self.action_space, sub)
+                    for action in sub_actions:
+                        self.act_to_sub[str(action)] = sub
+                        cluster_action_ids.append(action)  # Actions are identifiable and unique
             self.cluster_actions.append(cluster_action_ids)
             self.n_cluster_actions.append(len(cluster_action_ids))
 
@@ -80,6 +88,7 @@ class RAMAActionConverter(SimpleDiscActionConverter):
         action = self.cluster_actions[ra_idx][action]
         # return action
         if self.inspect_act(ra_idx, action, topo_vect):
+            self.current_ra = ra_idx
             return action
         else:  # return do nothing action.
             return self.action_space()

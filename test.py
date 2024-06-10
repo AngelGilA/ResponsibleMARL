@@ -116,12 +116,6 @@ def cli():
         help='this agent manages the substations containing topology elements over "mask"',
     )
 
-    # parser.add_argument(
-    #     "-cl", 
-    #     "--clusters", 
-    #     type=str, 
-    #     help="Optional: Path to cluster configuration file", default="")
-
     parser.add_argument("-mr", "--max_reward", type=int, default=10, help="max reward during training")
     parser.add_argument(
         "-i",
@@ -247,8 +241,14 @@ def cli():
     parser.add_argument("-en", "--entropy", type=float, default=0.01)
     parser.add_argument("-l", "--lambda", type=float, default=0.95, help="GAE parameter PPO")
 
+    # ReAr parameters
+    parser.add_argument("-nc", "--n_clusters", type=int, help="number of clusters", default=1)
+    parser.add_argument("-cm", "--cluster_method", type=str, help="clustering method", default="kmeans")
+    
     args = parser.parse_args()
     return args
+
+
 
 
 def log_params(args, path):

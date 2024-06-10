@@ -7,9 +7,7 @@ from Agents.SACD import BaseSacd, SacdShared
 from MultiAgents.MASACD import DependentSacd
 from MultiAgents.MAPPO import DependentPPO
 from MultiAgents.MAconverters import MADiscActionConverter, RAMAActionConverter
-from MultiAgents.MiddleAgent import RuleBasedSubPicker, RandomOrderedSubPicker, FixedSubPicker, ClusteredCAPAPicker, UrgentCAPAPicker
-
-from ResponsibilityAreas.GroupingMethods import dummy_cluster
+from MultiAgents.MiddleAgent import RuleBasedSubPicker, RandomOrderedSubPicker, FixedSubPicker, ClusteredCAPAPicker, UrgentPicker
 
 AGENT = {
     "isacd_base": BaseSacd,
@@ -19,6 +17,7 @@ AGENT = {
     "dppo": DependentPPO,
     # "sharedsacd": BaseSacdSharedLayer,
     "raippo": BasePPO,
+    "raisacd": BaseSacd,
 }
 
 MIDDLE_AGENT = {
@@ -26,7 +25,6 @@ MIDDLE_AGENT = {
     "random": RandomOrderedSubPicker,
     "capa": RuleBasedSubPicker,
 }
-
 
 class IMARL(L2rpnAgent):
     """
@@ -89,7 +87,7 @@ class IMARL(L2rpnAgent):
                 stacked_state = self.get_current_state().to(self.device)
                 adj = self.adj.unsqueeze(0)
                 sub_2_act = self.sub_picker.pick_sub(obs, sample)
-                action = self.agents[sub_2_act].produce_action(stacked_state, adj, sample=sample)
+                action = self.agents[sub_2_act].produce_action(stacked_state, adj, sample=sample, dn_count=dn_count)
                 goal = (sub_2_act, action)
                 act = self.action_converter.plan_act(goal, obs.topo_vect)
                 if sample:
@@ -138,7 +136,7 @@ class IMARL(L2rpnAgent):
     def print_updates_per_agent(self):
         for agent in self.agents.items():
             print(f"Agent for sub {agent[0]} had {agent[1].update_step} updates")
-        print(f"Middle-Agent transition matrix:\n{self.sub_picker.count}")
+        #print(f"Middle-Agent transition matrix:\n{self.sub_picker.count}")
 
     def save_model(self, path, name):
         [agent.save_model(f"{path}", f"{name}_sub_{sub}") for sub, agent in self.agents.items()]
@@ -163,14 +161,16 @@ class ReArIMARL(L2rpnAgent):
     def __init__(self, env, **kwargs):
         super().__init__(env, **kwargs)
         
-        # options: ClusteredCapaPicker or UrgentCapaPicker
-        self.sub_picker = ClusteredCAPAPicker(clusters=self.action_converter.clusters, action_space=self.action_space)
+        # options: ClusteredCapaPicker or UrgentPicker
+        self.sub_picker = UrgentPicker(clusters=self.action_converter.clusters, action_space=self.action_space)
 
         # create deep learning part of the agent
         self.create_DLA(**kwargs)
 
     def create_action_converter(self, env, mask, mask_hi, **kwargs):
-        return RAMAActionConverter(env, mask, mask_hi)
+        print(f"kwargs: {kwargs}")
+        print(f"n_clusters: {kwargs.get('n_clusters',1)}")
+        return RAMAActionConverter(env, mask, mask_hi, kwargs.get("n_clusters",1), kwargs.get("cluster_method","kmeans"))
 
     def create_DLA(self, **kwargs):
         agent_type = AGENT[kwargs.get("agent")]
@@ -182,7 +182,7 @@ class ReArIMARL(L2rpnAgent):
 
     def agent_act(self, obs, is_safe, sample, dn_count=0) -> BaseAction:
         # generate action if not safe
-        if not is_safe or (len(self.sub_picker.activation_sequence) > 0):
+        if not is_safe:
             # print()
             # print("RAs to act: ",self.sub_picker.activation_sequence)
 
@@ -190,13 +190,14 @@ class ReArIMARL(L2rpnAgent):
                 stacked_state = self.get_current_state().to(self.device)
                 adj = self.adj.unsqueeze(0)
                 ra_2_act = self.sub_picker.pick_cluster(obs, sample)
-                action = self.agents[ra_2_act].produce_action(stacked_state, adj, sample=sample)
+                action = self.agents[ra_2_act].produce_action(stacked_state, adj, sample=sample, dn_count=dn_count)
                 goal = (ra_2_act, action)
                 act = self.action_converter.plan_act(goal, obs.topo_vect)
                 #print(act)
                 if sample:
                     self.update_goal(goal)
-                elif (act == self.action_space()) & (dn_count < len(self.sub_picker.activation_sequence)):
+                #elif (act == self.action_space()) & (dn_count < len(self.sub_picker.activation_sequence)):
+                elif (act == self.action_space()) & (dn_count < 0):
                     # skip DoNothing action when we are not training
                     act = self.agent_act(obs, is_safe, sample, dn_count=dn_count + 1)
                 return act
@@ -245,7 +246,7 @@ class ReArIMARL(L2rpnAgent):
     def print_updates_per_agent(self):
         for agent in self.agents.items():
             print(f"Agent for RA {agent[0]} had {agent[1].update_step} updates")
-        print(f"Middle-Agent transition matrix:\n{self.sub_picker.count}")
+        print(f"Middle-Agent transition matrix (RA):\n{self.sub_picker.count}")
 
     def save_model(self, path, name):
         [agent.save_model(f"{path}", f"{name}_ra_{sub}") for sub, agent in self.agents.items()]

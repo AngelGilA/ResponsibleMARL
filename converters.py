@@ -13,7 +13,7 @@ class SimpleDiscActionConverter:
         self.mask = mask
         self.mask_hi = mask_hi
         self.rule = rule
-        self.sub_mask = []  # mask for parsing actionable topology. ªIrrelevant for MA
+        self.sub_mask = []  # mask for parsing actionable topology.
         self.psubs = []  # actionable substation IDs
         self.masked_sub_begin = []
         self.masked_sub_end = []
